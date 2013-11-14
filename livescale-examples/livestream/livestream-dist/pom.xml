@@ -1,0 +1,56 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<artifactId>livestream</artifactId>
+		<groupId>de.tuberlin.cit</groupId>
+		<version>git</version>
+		<relativePath>..</relativePath>
+	</parent>
+
+	<artifactId>livestream-dist</artifactId>
+	<name>livestream-dist</name>
+	<description>Meta assembly project for the livestream example</description>
+	<packaging>pom</packaging>
+
+	<dependencies>
+		<dependency>
+			<groupId>de.tuberlin.cit</groupId>
+			<artifactId>livestream-web</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>de.tuberlin.cit</groupId>
+			<artifactId>livestream-nephele</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>de.tuberlin.cit</groupId>
+			<artifactId>livestream-dispatcher</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+	</dependencies>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>generate-package</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<descriptors>
+						<descriptor>src/main/assemblies/bin.xml</descriptor>
+					</descriptors>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>

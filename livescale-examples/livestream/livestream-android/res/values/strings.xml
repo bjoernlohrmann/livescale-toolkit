@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="main_heading">Welcome to CITStreamer, the Social Cloud Media Streaming App!</string>
+	
+	<string name="main_broadcast">Start a new live broadcast.</string>
+	
+	<string name="main_manualrcv">To start watching a stream simply follow a CITstreamer link on Facebook or somewhere else on the web.\nYou can also enter a stream code manually:</string>
+	
+	<string name="main_but_bc">Broadcast</string>
+	
+	<string name="main_but_manualrcv">Watch this stream</string>
+	
+	<string name="main_error_not_connected">Error: You are NOT connected to a CITstreamer server!</string>
+	
+	<string name="main_error_manualrcv_empty">Please enter a valid code!</string>
+	
+	<string name="main_error_manualrcv_illegal">Error: Code is invalid!</string>
+	
+	<string name="main_but_rec">Receive</string>
+    
+    <string name="app_name">CITStreamer</string>
+
+    <string name="menu_refresh">Refresh</string>
+	
+    <string name="menu_prefs">Preferences</string>
+	
+    <string name="menu_share">Share</string>
+	
+	<string name="menu_favorite">Set user as favorite</string>
+	
+	<string name="menu_no_favorite">Remove user as favorite</string>
+
+	<string name="button_close">Close</string>
+	
+	<string name="button_cancel">Cancel</string>
+    
+    <string name="button_ok">OK</string>
+
+	<string name="msg_connecting">Connecting&#8230;</string>
+
+	<string name="msg_broker_connection_info">Successfully connected to\u0020</string>
+
+	<string name="msg_favorite_state_check">Check favorite state</string>
+
+	<string name="msg_favorite_state_set">Set as favorite</string>
+
+	<string name="msg_favorite_state_remove">Remove from favorites</string>
+
+	<string name="msg_first_run">Welcome to CITStreamer!\nThis is the Preferences Screen. Please set your username and password and tap on \"Register/Check Account\" to verify your account or to create a new one. You can also choose to connect to an alternative server if necessary.</string>
+
+	<string name="notification_new_stream_ticker">New Stream!</string>
+
+	<string name="notification_title">CITstreamer</string>
+
+	<string name="notification_new_stream_text_prefix">New Stream from User\u0020</string>
+
+	<string name="prefs_register_summary_empty_username_password">Username/password must not be empty!</string>
+
+	<string name="prefs_register_summary_connected">Connected</string>
+
+	<string name="prefs_register_summary_no_answer">Answer from server: -</string>
+
+	<string name="prefs_status_summary_not_connected">Not connected to a server!</string>
+
+	<string name="prefs_register_summary_not_connected">Not connected to a server!</string>
+
+	<string name="prefs_register_summary_answer_prefix">Answer from server:\u0020</string>
+	
+	<string name="prefs_camera">Camera\u0020</string>
+    
+    <string name="camera_settings_detection_in_progress">Detecting camera settings</string>
+    
+    <string name="camera_settings_detection_failed">Failed to detect camera settings (streaming will not be possible)</string>
+    
+    <string name="connection_failed_message">Could not connect to streaming server. Please check your network connectivity or try again later.</string>
+    
+    <string name="internal_error_message">Internal error. Please try again later.</string>
+    
+    <string name="button_stream_on">Stop</string>
+    
+    <string name="button_stream_off">Stream</string>
+    
+    <string name="videplayer_buffering">Buffering video&#8230;</string>
+    
+    <string name="button_videoplayer_fav_on">Favorite</string>
+    
+    <string name="button_videoplayer_fav_off">Favorite</string>
+    
+    <string name="button_stream_share">Share</string>
+    
+    <string name="dialog_share_title">Share</string>
+    
+    <string name="dialog_qrcode_title">QR Code</string>
+    
+    <string name="share_facebook_feed_caption">I\'m broadcasting, click here to join!</string>
+    
+    <string name="share_facebook_feed_msg">Watch my current livestream NOW with CITstreamer for Android</string>
+    
+    <string name="share_twitter_tweet_msg">Watch my Stream NOW at\u0020</string>
+    
+    <string name="share_intent_title">Share via&#8230;</string>
+    
+    <string name="share_intent_msgprefix">Watch my current livestream at\u0020</string>
+    
+    <string name="share_qrcode_contentdesc_imageview">QR-Code</string>
+    
+    <string-array name="share_providers">
+        <item>Facebook</item>
+        <item>Twitter</item>
+        <item>QR Code</item>
+        <item>Others</item>
+    </string-array>
+</resources>

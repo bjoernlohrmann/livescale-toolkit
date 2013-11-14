@@ -1,0 +1,7 @@
+To build you've got to install google's gcm-server helper jar locally (until it's available in a public maven repo)
+
+change to the ./lib directory and run 
+
+mvn install
+
+to install the provided version as a local repository

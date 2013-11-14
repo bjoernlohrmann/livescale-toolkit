@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+    <EditTextPreference android:key="username" android:title="Username" android:order="1" android:summary="Your CITStreamer username"/>
+    <EditTextPreference android:title="Password" android:order="2" android:key="password" android:password="true" android:summary="The corresponding password"/>
+    <Preference android:title="Register/Check Account" android:key="register" android:order="3"/>
+    <EditTextPreference android:key="server_address" android:title="Server Address" android:summary="IP or Hostname of CITStreamer server" android:defaultValue="130.149.248.128" android:order="4"/>
+    <EditTextPreference android:key="server_port" android:title="Server Port" android:summary="Port of CITStreamer server" android:defaultValue="5672" android:order="5"/>
+    <Preference android:title="Current server status" android:key="status" android:order="6" />
+    <ListPreference android:key="camera" android:order="7" android:title="Camera Device" android:summary="The camera device (rear/front) to use"/>
+    <ListPreference android:key="quality" android:order="8" android:title="Video Quality" android:summary="The video quality to use for broadcasting"/>
+    <CheckBoxPreference android:title="Notification" android:summary="Notify me about favorite streams" android:key="bg_listen" android:defaultValue="true" android:order="9"/>
+</PreferenceScreen>

@@ -1,0 +1,23 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<artifactId>livescale-examples</artifactId>
+		<groupId>de.tuberlin.cit</groupId>
+		<version>git</version>
+		<relativePath>..</relativePath>
+	</parent>
+
+	<artifactId>livestream</artifactId>
+	<name>livestream</name>
+	<packaging>pom</packaging>
+
+	<modules>
+		<module>livestream-dispatcher</module>
+		<module>livestream-web</module>
+		<module>livestream-nephele</module>
+		<module>livestream-dist</module>
+		<!-- put more example modules here -->
+	</modules>
+</project>

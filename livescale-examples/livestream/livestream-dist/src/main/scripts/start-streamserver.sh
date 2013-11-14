@@ -1,0 +1,18 @@
+#!/bin/bash
+CLASS_TO_RUN="de.tuberlin.cit.livescale.CitstreamerPrototypeJob"
+
+pushd $(dirname $0) > /dev/null
+SCRIPTPATH=$(pwd)
+popd > /dev/null
+
+#---------------------------------#
+# dynamically build the classpath #
+#---------------------------------#
+THE_CLASSPATH=""
+for i in $(ls "${SCRIPTPATH}"/lib/*.jar)
+do
+  THE_CLASSPATH="${THE_CLASSPATH}:${i}"
+done
+
+java -cp "${THE_CLASSPATH}" "${CLASS_TO_RUN}"  "${SCRIPTPATH}" > "${SCRIPTPATH}/log/streamserver.out" 2>&1 < /dev/null &
+echo $! > "${SCRIPTPATH}/log/streamserver.pid"

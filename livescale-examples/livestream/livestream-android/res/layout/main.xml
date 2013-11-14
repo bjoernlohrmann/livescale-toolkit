@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@color/black"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent" >
+
+    <ScrollView
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:background="@drawable/bg"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent" >
+
+        <LinearLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:orientation="vertical" >
+
+            <TextView
+                android:id="@+id/main_tv_heading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:gravity="center"
+                android:paddingBottom="2dp"
+                android:paddingLeft="5dp"
+                android:paddingRight="5dp"
+                android:paddingTop="20dp"
+                android:text="@string/main_heading"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/main_tv_broadcast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:gravity="center"
+                android:paddingBottom="2dp"
+                android:paddingLeft="5dp"
+                android:paddingRight="5dp"
+                android:paddingTop="40dp"
+                android:text="@string/main_broadcast"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/main_button_broadcast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="5pt"
+                android:gravity="center"
+                android:padding="10dp"
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp"
+                android:text="@string/main_but_bc"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/main_tv_manualrcv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:gravity="center"
+                android:paddingBottom="2dp"
+                android:paddingLeft="5dp"
+                android:paddingRight="5dp"
+                android:paddingTop="40dp"
+                android:text="@string/main_manualrcv"
+                android:textSize="15sp" />
+
+            <EditText
+                android:id="@+id/main_et_rcvtoken"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="5pt"
+                android:ems="10"
+                android:inputType="textNoSuggestions" >
+            </EditText>
+
+            <Button
+                android:id="@+id/main_button_manualrcv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="10dp"
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp"
+                android:text="@string/main_but_manualrcv"
+                android:textSize="20sp" />
+        </LinearLayout>
+    
+    </ScrollView>
+
+</LinearLayout>

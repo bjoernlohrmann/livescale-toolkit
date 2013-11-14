@@ -1,0 +1,43 @@
+Livestream
+==========
+
+This archive contains 
+
+* livestream-streamserver - A nephele-task that implements the actual video
+  streaming. 
+* livestream-dispatcher - A server software that orchestrates clients and the
+  cloud.  
+* livestream-web - A simple webserver application that converts http request
+  to Android intents. (optional) 
+
+and some start/stop scripts for the components. 
+
+Requirements
+============
+
+To run livestream you'll also need 
+
+* Java 6+
+* Ports:
+** tcp/5672 (AMQP)
+** tcp/43000, tcp/43001, tcp/43002, ...., tcp/43010 (Stratosphere)
+** tcp/80, tcp/443 (HTTP/S)
+* a running amqp software (for instance rabbitmq)
+* a running instance of stratosphere compatible with the archive's version
+  version of stratosphere streaming (livestream-0 with stratosphere-0) 
+
+Usage
+=====
+
+For local use unzip/untar this archive on the target system then 
+
+1. Start the amqp host
+2. Start stratosphere
+3. Change to the livestream-[version]/ directory. 
+4. ./start-stratosphere.sh
+5. ./start-dispatcher.sh
+6. ./start-web.sh <port>
+
+You'll may have to become root to start the webserver on port <= 1024
+
+Please check for component log messages and pids in the log directory. 
