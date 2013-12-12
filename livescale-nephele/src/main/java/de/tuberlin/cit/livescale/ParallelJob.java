@@ -9,25 +9,26 @@ import de.tuberlin.cit.livescale.job.task.MultiFileStreamSourceTask;
 import de.tuberlin.cit.livescale.job.task.OverlayTask;
 import de.tuberlin.cit.livescale.job.task.VideoReceiverTask;
 import de.tuberlin.cit.livescale.job.util.encoder.VideoEncoder;
-import de.tuberlin.cit.livescale.job.util.overlay.TwitterOverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.LogoOverlayProvider;
 import eu.stratosphere.nephele.client.JobClient;
 import eu.stratosphere.nephele.client.JobExecutionException;
 import eu.stratosphere.nephele.configuration.ConfigConstants;
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.fs.Path;
+import eu.stratosphere.nephele.io.DistributionPattern;
 import eu.stratosphere.nephele.io.channels.ChannelType;
-import eu.stratosphere.nephele.io.compression.CompressionLevel;
-import eu.stratosphere.nephele.jobgraph.JobFileOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
 import eu.stratosphere.nephele.jobgraph.JobGraphDefinitionException;
 import eu.stratosphere.nephele.jobgraph.JobInputVertex;
+import eu.stratosphere.nephele.jobgraph.JobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
+import eu.stratosphere.nephele.streaming.ConstraintUtil;
 
 public class ParallelJob {
 
 	private static final String INSTANCE_TYPE = "default";
 
-	private static final int NUMBER_OF_SUBTASKS_PER_INSTANCE = 1;
+	private static final int NUMBER_OF_SUBTASKS_PER_INSTANCE = 2;
 
 	public static void main(final String[] args) {
 
@@ -115,31 +116,36 @@ public class ParallelJob {
 			final JobTaskVertex overlay = new JobTaskVertex("Overlay", graph);
 			overlay.setTaskClass(OverlayTask.class);
 			overlay.setNumberOfSubtasks(degreeOfParallelism);
-			overlay.getConfiguration().setString(TwitterOverlayProvider.TWITTER_USERNAME_KEY, "danielwarneke");
-			overlay.getConfiguration().setString(TwitterOverlayProvider.TWITTER_PASSWORD_KEY, "T7$dDp1");
-			overlay.getConfiguration().setString(TwitterOverlayProvider.TWITTER_KEYWORD_KEY, "berlin");
+			overlay.getConfiguration().setString(LogoOverlayProvider.LOGO_OVERLAY_IMAGE, "/home/bjoern/logo.png");			
 			overlay.setInstanceType(INSTANCE_TYPE);
 			overlay.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
 
+			
 			final JobTaskVertex encoder = new JobTaskVertex("Encoder", graph);
 			encoder.setNumberOfSubtasks(degreeOfParallelism);
 			encoder.setTaskClass(EncoderTask.class);
-			encoder.getConfiguration().setString(VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv");
+			encoder.getConfiguration().setString(
+					VideoEncoder.ENCODER_OUTPUT_FORMAT, "mpegts");
 			encoder.setInstanceType(INSTANCE_TYPE);
 			encoder.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
 
-			final JobFileOutputVertex output = new JobFileOutputVertex("Receiver", graph);
-			output.setFileOutputClass(VideoReceiverTask.class);
-			output.setFilePath(new Path("file:///home/warneke/out.flv"));
+			final JobOutputVertex output = new JobOutputVertex("Receiver", graph);
+			output.setOutputClass(VideoReceiverTask.class);
+			output.getConfiguration().setString(VideoReceiverTask.BROADCAST_TRANSPORT, "http");
 			output.setInstanceType(INSTANCE_TYPE);
 			output.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
 
-			fileStreamSource.connectTo(decoder, ChannelType.NETWORK, CompressionLevel.NO_COMPRESSION);
-			decoder.connectTo(merger, ChannelType.NETWORK, CompressionLevel.NO_COMPRESSION);
-			merger.connectTo(overlay, ChannelType.NETWORK, CompressionLevel.NO_COMPRESSION);
-			overlay.connectTo(encoder, ChannelType.NETWORK, CompressionLevel.NO_COMPRESSION);
-			encoder.connectTo(output, ChannelType.NETWORK, CompressionLevel.NO_COMPRESSION);
+			fileStreamSource.connectTo(decoder, ChannelType.NETWORK, DistributionPattern.BIPARTITE);
+			decoder.connectTo(merger, ChannelType.NETWORK, DistributionPattern.POINTWISE);
+			merger.connectTo(overlay, ChannelType.NETWORK, DistributionPattern.POINTWISE);
+			overlay.connectTo(encoder, ChannelType.NETWORK, DistributionPattern.POINTWISE);
+			encoder.connectTo(output, ChannelType.NETWORK, DistributionPattern.BIPARTITE);
 
+			ConstraintUtil.defineAllLatencyConstraintsBetween(
+					fileStreamSource.getForwardConnection(0),
+					encoder.getForwardConnection(0), 100);
+			
+			
 			// Configure instance sharing
 			decoder.setVertexToShareInstancesWith(fileStreamSource);
 			merger.setVertexToShareInstancesWith(fileStreamSource);
@@ -147,19 +153,22 @@ public class ParallelJob {
 			encoder.setVertexToShareInstancesWith(fileStreamSource);
 			output.setVertexToShareInstancesWith(fileStreamSource);
 			
-			//decoder.setVertexToShareInstancesWith(fileStreamSource);
-			/*merger.setVertexToShareInstancesWith(decoder);
-			overlay.setVertexToShareInstancesWith(decoder);
-			encoder.setVertexToShareInstancesWith(decoder);
-			output.setVertexToShareInstancesWith(decoder);*/
+//			decoder.setVertexToShareInstancesWith(fileStreamSource);
+//			merger.setVertexToShareInstancesWith(decoder);
+//			overlay.setVertexToShareInstancesWith(merger);
+//			encoder.setVertexToShareInstancesWith(overlay);
+//			output.setVertexToShareInstancesWith(encoder);
 
 			// Create jar file for job deployment
-			Process p = Runtime.getRuntime().exec("mvn package");
-			p.waitFor();
+			Process p = Runtime.getRuntime().exec("mvn clean package");
+			if(p.waitFor() != 0) {
+				System.out.println("Failed to build livescale-nephele jar");
+				System.exit(1);
+			}
 
 			String userHome = System.getProperty("user.home");
 			
-			graph.addJar(new Path("target/livestream-0.0.1.jar"));
+			graph.addJar(new Path("target/livescale-nephele-git.jar"));
 			graph.addJar(new Path(userHome + "/.m2/repository/xuggle/xuggle-xuggler/5.4/xuggle-xuggler-5.4.jar"));
 			graph.addJar(new Path(userHome + "/.m2/repository/org/slf4j/slf4j-api/1.6.4/slf4j-api-1.6.4.jar"));
 			graph.addJar(new Path(userHome + "/.m2/repository/commons-cli/commons-cli/1.1/commons-cli-1.1.jar"));

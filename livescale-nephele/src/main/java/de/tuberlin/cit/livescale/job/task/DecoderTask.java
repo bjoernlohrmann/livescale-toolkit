@@ -34,6 +34,7 @@ public final class DecoderTask extends AbstractTask implements EventListener {
 		this.packetReader.subscribeToEvent(this, StreamAnnounceEvent.class);
 		this.writer = new RecordWriter<VideoFrame>(this, VideoFrame.class, channelSelector);
 		this.writer.subscribeToEvent(this, StreamAnnounceReplyEvent.class);
+		getEnvironment().registerMapper(this.mapper);
 	}
 
 	/**
@@ -41,8 +42,6 @@ public final class DecoderTask extends AbstractTask implements EventListener {
 	 */
 	@Override
 	public void invoke() throws Exception {
-
-		getEnvironment().registerMapper(this.mapper);
 
 		final Queue<VideoFrame> outputCollector = this.mapper.getOutputCollector();
 

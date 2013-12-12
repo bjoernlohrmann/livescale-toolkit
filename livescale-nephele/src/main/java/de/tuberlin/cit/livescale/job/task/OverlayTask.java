@@ -19,7 +19,7 @@ public class OverlayTask extends AbstractTask implements EventListener {
 
 	private RecordWriter<VideoFrame> writer;
 
-	private final Mapper<VideoFrame, VideoFrame> mapper = new OverlayMapper();
+	private Mapper<VideoFrame, VideoFrame> mapper;
 
 	/**
 	 * {@inheritDoc}
@@ -30,6 +30,8 @@ public class OverlayTask extends AbstractTask implements EventListener {
 		this.reader.subscribeToEvent(this, StreamAnnounceEvent.class);
 		this.writer = new RecordWriter<VideoFrame>(this, VideoFrame.class);
 		this.writer.subscribeToEvent(this, StreamAnnounceReplyEvent.class);
+		this.mapper = new OverlayMapper(this.getTaskConfiguration());
+		getEnvironment().registerMapper(this.mapper);
 	}
 
 	/**
@@ -38,9 +40,8 @@ public class OverlayTask extends AbstractTask implements EventListener {
 	@Override
 	public void invoke() throws Exception {
 
-		getEnvironment().registerMapper(this.mapper);
-
-		final Queue<VideoFrame> outputCollector = this.mapper.getOutputCollector();
+		final Queue<VideoFrame> outputCollector = this.mapper
+				.getOutputCollector();
 
 		try {
 			// Consume the stream
@@ -54,7 +55,8 @@ public class OverlayTask extends AbstractTask implements EventListener {
 				while (!outputCollector.isEmpty()) {
 					VideoFrame frameToEmit = outputCollector.poll();
 					this.writer.emit(frameToEmit);
-					shouldFlush = shouldFlush || frameToEmit.isEndOfStreamFrame();
+					shouldFlush = shouldFlush
+							|| frameToEmit.isEndOfStreamFrame();
 				}
 
 				if (shouldFlush) {

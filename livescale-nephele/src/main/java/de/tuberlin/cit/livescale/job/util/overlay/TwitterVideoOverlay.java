@@ -47,8 +47,9 @@ public class TwitterVideoOverlay implements VideoOverlay {
 
 		this.user = status.getUser().getScreenName();
 		this.text = status.getText();
+		System.out.println("Got twitter with text: " + this.text);
 
-		final URL profileImageURL = status.getUser().getProfileImageURL();
+		final URL profileImageURL = null;// status.getUser().getProfileImageURL();
 		if (profileImageURL != null) {
 
 			final HttpURLConnection connection = (HttpURLConnection) profileImageURL.openConnection();

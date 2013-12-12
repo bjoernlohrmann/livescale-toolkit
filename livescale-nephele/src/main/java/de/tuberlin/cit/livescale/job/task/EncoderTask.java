@@ -35,6 +35,10 @@ public final class EncoderTask extends AbstractTask implements EventListener {
 		this.reader.subscribeToEvent(this, StreamAnnounceEvent.class);
 		this.packetWriter = new RecordWriter<Packet>(this, Packet.class, channelSelector);
 		this.packetWriter.subscribeToEvent(this, StreamAnnounceReplyEvent.class);
+		this.mapper = new EncoderMapper(getTaskConfiguration().getString(
+				VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv"));
+
+		getEnvironment().registerMapper(this.mapper);
 	}
 
 	/**
@@ -42,10 +46,6 @@ public final class EncoderTask extends AbstractTask implements EventListener {
 	 */
 	@Override
 	public void invoke() throws Exception {
-		this.mapper = new EncoderMapper(getTaskConfiguration().getString(
-				VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv"));
-
-		getEnvironment().registerMapper(this.mapper);
 
 		final Queue<Packet> outputCollector = this.mapper.getOutputCollector();
 

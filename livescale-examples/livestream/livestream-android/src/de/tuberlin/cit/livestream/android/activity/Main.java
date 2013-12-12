@@ -11,6 +11,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -89,8 +90,11 @@ public class Main extends ActionBarActivity {
 																	// to
 																	// application
 																	// Context
-
-		Messaging.getInstance().attach(this);
+		try {
+			Messaging.getInstance().attach(this);
+		} catch (Throwable e) {
+			Log.e("Main", "error during messaging init", e.getCause());
+		}
 		if (checkForReceiveIntent())
 			return;
 		else {

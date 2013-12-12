@@ -15,11 +15,10 @@ import eu.stratosphere.nephele.configuration.ConfigConstants;
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.fs.Path;
 import eu.stratosphere.nephele.io.channels.ChannelType;
-import eu.stratosphere.nephele.io.compression.CompressionLevel;
 import eu.stratosphere.nephele.jobgraph.JobFileInputVertex;
-import eu.stratosphere.nephele.jobgraph.JobFileOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
 import eu.stratosphere.nephele.jobgraph.JobGraphDefinitionException;
+import eu.stratosphere.nephele.jobgraph.JobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 
 public final class JobWithFileInput {
@@ -53,14 +52,17 @@ public final class JobWithFileInput {
 			encoder.setTaskClass(EncoderTask.class);
 			encoder.getConfiguration().setString(VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv");
 			
-			final JobFileOutputVertex output = new JobFileOutputVertex("Receiver", graph);
-			output.setFileOutputClass(VideoReceiverTask.class);
-			output.setFilePath(new Path("file://" + args[1]));
+			final JobOutputVertex output = new JobOutputVertex("Receiver",
+					graph);
+			output.setOutputClass(VideoReceiverTask.class);
+			output.getConfiguration().setString(
+					VideoReceiverTask.BROADCAST_TRANSPORT,
+					"file://" + args[1]);
 
-			fileStreamSource.connectTo(decoder, ChannelType.INMEMORY, CompressionLevel.NO_COMPRESSION);
-			decoder.connectTo(overlay, ChannelType.INMEMORY, CompressionLevel.NO_COMPRESSION);
-			overlay.connectTo(encoder, ChannelType.INMEMORY, CompressionLevel.NO_COMPRESSION);
-			encoder.connectTo(output, ChannelType.INMEMORY, CompressionLevel.NO_COMPRESSION);
+			fileStreamSource.connectTo(decoder, ChannelType.INMEMORY);
+			decoder.connectTo(overlay, ChannelType.INMEMORY);
+			overlay.connectTo(encoder, ChannelType.INMEMORY);
+			encoder.connectTo(output, ChannelType.INMEMORY);
 			
 			Process p = Runtime.getRuntime().exec("mvn package");
 			p.waitFor();

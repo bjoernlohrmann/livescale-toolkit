@@ -32,20 +32,20 @@ import de.tuberlin.cit.livestream.android.activity.Main;
 import de.tuberlin.cit.livestream.android.activity.Videoplayer;
 import de.tuberlin.cit.livestream.android.broadcast.BCConstants;
 import de.tuberlin.cit.livestream.android.view.SetupStreamingAsyncTask;
-import de.tuberlin.cit.livestream.messaging.MessageCenter;
-import de.tuberlin.cit.livestream.messaging.MessageDeliveryEventListener;
-import de.tuberlin.cit.livestream.messaging.MessageListener;
-import de.tuberlin.cit.livestream.messaging.endpoints.AMQPEndpoint;
-import de.tuberlin.cit.livestream.messaging.endpoints.MessageDeliveryEvent;
-import de.tuberlin.cit.livestream.messaging.messages.ClientFollowerAnswer;
-import de.tuberlin.cit.livestream.messaging.messages.ClientRegistrationAnswer;
-import de.tuberlin.cit.livestream.messaging.messages.ClientStreamRcv;
-import de.tuberlin.cit.livestream.messaging.messages.ClientStreamSend;
-import de.tuberlin.cit.livestream.messaging.messages.DispatcherGCM;
-import de.tuberlin.cit.livestream.messaging.messages.DispatcherRegistration;
-import de.tuberlin.cit.livestream.messaging.messages.DispatcherRequestFollower;
-import de.tuberlin.cit.livestream.messaging.messages.DispatcherRequestStreamRcv;
-import de.tuberlin.cit.livestream.messaging.messages.DispatcherRequestStreamSend;
+import de.tuberlin.cit.livescale.messaging.MessageCenter;
+import de.tuberlin.cit.livescale.messaging.MessageDeliveryEventListener;
+import de.tuberlin.cit.livescale.messaging.MessageListener;
+import de.tuberlin.cit.livescale.messaging.endpoints.AMQPEndpoint;
+import de.tuberlin.cit.livescale.messaging.endpoints.MessageDeliveryEvent;
+import de.tuberlin.cit.livescale.messaging.messages.ClientFollowerAnswer;
+import de.tuberlin.cit.livescale.messaging.messages.ClientRegistrationAnswer;
+import de.tuberlin.cit.livescale.messaging.messages.ClientStreamRcv;
+import de.tuberlin.cit.livescale.messaging.messages.ClientStreamSend;
+import de.tuberlin.cit.livescale.messaging.messages.DispatcherGCM;
+import de.tuberlin.cit.livescale.messaging.messages.DispatcherRegistration;
+import de.tuberlin.cit.livescale.messaging.messages.DispatcherRequestFollower;
+import de.tuberlin.cit.livescale.messaging.messages.DispatcherRequestStreamRcv;
+import de.tuberlin.cit.livescale.messaging.messages.DispatcherRequestStreamSend;
 
 /**
  * This singleton encapsulates 
