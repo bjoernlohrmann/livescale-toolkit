@@ -180,6 +180,8 @@ public class Messaging {
 		final String brokerPort = this.preferences.getString(Constants.PREF_SERVER_PORT, "5672");
 		// p.putAll(this.preferences.getAll());
 		
+		Log.i(TAG, String.format("Connecting to AMQP broker at %s:%s", brokerAddress, brokerPort));
+		
 		final Properties p = new AMQPEndpoint.ConfigBuilder().
 				brokerAddress(brokerAddress).
 				brokerPort(Integer.parseInt(brokerPort)).
@@ -203,7 +205,7 @@ public class Messaging {
 	}
 	
 	public void sendDispatcherC2dm(final String username, final String password, final String c2dmKey) {
-		Log.d(TAG, "Sending DispatcherC2dm");
+		Log.i(TAG, "Sending DispatcherC2dm");
 		final DispatcherGCM msg = new DispatcherGCM();
 		msg.setUsername(username);
 		msg.setPassword(password); 
@@ -212,7 +214,7 @@ public class Messaging {
 	}
 	
 	public void sendDispatcherRegistration(final String username, final String password) {
-		Log.d(TAG, "Sending DispatcherRegistration");
+		Log.i(TAG, "Sending DispatcherRegistration");
 		final DispatcherRegistration msg = new DispatcherRegistration();
 		msg.setUsername(username);
 		msg.setPassword(password);
@@ -221,7 +223,7 @@ public class Messaging {
 
 	
 	public void sendDispatcherRequestFollower(final String username, final String password, final String favorite, final int request) {
-		Log.d(TAG, "Sending DispatcherRequestFollower");
+		Log.i(TAG, "Sending DispatcherRequestFollower");
 		final DispatcherRequestFollower msg = new DispatcherRequestFollower();
 		msg.setUsername(username);
 		msg.setPassword(password);
@@ -231,14 +233,14 @@ public class Messaging {
 	}
 	
 	public void sendDispatcherRequestStreamRcv(final String rcvToken) {
-		Log.d(TAG, "Sending DispatcherRequestStreamRcv");
+		Log.i(TAG, "Sending DispatcherRequestStreamRcv");
 		final DispatcherRequestStreamRcv msg = new DispatcherRequestStreamRcv();
 		msg.setToken(rcvToken);
 		this.messageCenter.send(msg, getDispatcherBroadcastURI());
 	}
 	
 	public void sendDispatcherRequestStreamSend(final String username, final String password) {
-		Log.d(TAG, "Sending DispatcherRequestStreamSend");
+		Log.i(TAG, "Sending DispatcherRequestStreamSend");
 		final DispatcherRequestStreamSend msg = new DispatcherRequestStreamSend();
 		msg.setUsername(username);
 		msg.setPassword(password);
@@ -286,7 +288,7 @@ public class Messaging {
 			new MessageListener<ClientFollowerAnswer>() {
 				@Override
 				public void handleMessageReceived(final ClientFollowerAnswer message) {
-					Log.d(TAG, "Received ClientFollowerAnswer");
+					Log.i(TAG, "Received ClientFollowerAnswer");
 					final int result = message.getFollowerResult();
 					final String username = message.getUsername();
 					final String followerName = message.getFollowerName();
@@ -311,11 +313,11 @@ public class Messaging {
 				
 				@Override
 				public void handleMessageReceived(final ClientRegistrationAnswer message) {
-					Log.d(TAG, "Received ClientRegistrationAnswer");
+					Log.i(TAG, "Received ClientRegistrationAnswer");
 					Messaging.this.preferences.edit().
 						putBoolean(Constants.PREF_REGISTRATION_OK, message.isOk()).
 						putString(Constants.PREF_REGISTRATION_MSG, message.getErrorMessage()).
-						putLong(Constants.PREF_UPDATE_TIME, System.currentTimeMillis());
+						putLong(Constants.PREF_UPDATE_TIME, System.currentTimeMillis()).commit();
 				}
 			};
 	
@@ -336,7 +338,7 @@ public class Messaging {
 				
 				@Override
 				public void handleMessageReceived(final ClientStreamRcv message) {
-					Log.d(TAG, "Received ClientStreamRcv");
+					Log.i(TAG, "Received ClientStreamRcv");
 					final Intent videoplayerIntent = new Intent(Messaging.this.context, Videoplayer.class);
 					videoplayerIntent.putExtra("MAP_KEY_URL", 
 						Helper.encodeHTTPDirectStreamURL(
@@ -360,7 +362,7 @@ public class Messaging {
 				
 				@Override
 				public void handleMessageReceived(final ClientStreamSend message) {
-					Log.d(TAG, "Received ClientStreamSend");
+					Log.i(TAG, "Received ClientStreamSend");
 					final String receiveEndpointAddress = message.getReceiveEndpointAddress();
 					final int receiveEndpointPort = message.getReceiveEndpointPort();
 					final String receiveEndpointToken = message.getReceiveEndpointToken();
