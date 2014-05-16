@@ -21,28 +21,33 @@ public final class VideoFrame extends AbstractTaggableRecord {
 	public long streamId;
 
 	/**
-	 * A negative value marks the end of the stream and signals
-	 * that cleanup actions need to be taken.
+	 * A negative value marks the end of the stream and signals that cleanup
+	 * actions need to be taken.
 	 */
 	public int frameId;
 
 	public long groupId;
 
 	/**
-	 * Contains the timestamp of the frame inside the video
-	 * stream (i.e. in "video time", not wall clock time).
+	 * Contains the timestamp of the frame inside the video stream (i.e. in
+	 * "video time", not wall clock time).
 	 */
 	public long timestampInNanos;
 
 	public BufferedImage frameImage;
 
 	private final static ComponentColorModel COLOR_MODEL = new ComponentColorModel(
-		ColorSpace.getInstance(ColorSpace.CS_sRGB), false, false, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+			ColorSpace.getInstance(ColorSpace.CS_sRGB), false, false,
+			Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
 
 	public VideoFrame() {
+		this.frameId = -2;
+		this.streamId = -1;
+		this.groupId = -1;
 	}
 
-	public VideoFrame(long streamId, long groupId, int frameId, long frameTimestampInNanos, BufferedImage frameImage) {
+	public VideoFrame(long streamId, long groupId, int frameId,
+			long frameTimestampInNanos, BufferedImage frameImage) {
 		this.streamId = streamId;
 		this.groupId = groupId;
 		this.frameId = frameId;
@@ -59,19 +64,21 @@ public final class VideoFrame extends AbstractTaggableRecord {
 		out.writeInt(frameId);
 		out.writeLong(groupId);
 
-		if (!isEndOfStreamFrame()) {
+		if (!isEndOfStreamFrame() && !isDummyFrame()) {
 			out.writeLong(timestampInNanos);
 			serializeImage(frameImage, out);
 		}
 	}
 
-	private void serializeImage(BufferedImage bufferedImage, DataOutput out) throws IOException {
+	private void serializeImage(BufferedImage bufferedImage, DataOutput out)
+			throws IOException {
 
 		serializeSampleModel(bufferedImage.getSampleModel(), out);
 
 		final DataBuffer db = bufferedImage.getData().getDataBuffer();
 		if (!(db instanceof DataBufferByte)) {
-			throw new IllegalArgumentException("DataBuffer must be of type DataBufferByte");
+			throw new IllegalArgumentException(
+					"DataBuffer must be of type DataBufferByte");
 		}
 
 		// Banks
@@ -95,10 +102,12 @@ public final class VideoFrame extends AbstractTaggableRecord {
 
 	}
 
-	private void serializeSampleModel(SampleModel sm, DataOutput out) throws IOException {
+	private void serializeSampleModel(SampleModel sm, DataOutput out)
+			throws IOException {
 
 		if (!(sm instanceof PixelInterleavedSampleModel)) {
-			throw new IllegalArgumentException("Argument sm must be of type java.awt.image.PixelInterleavedSampleModel");
+			throw new IllegalArgumentException(
+					"Argument sm must be of type java.awt.image.PixelInterleavedSampleModel");
 		}
 
 		final PixelInterleavedSampleModel pism = (PixelInterleavedSampleModel) sm;
@@ -125,10 +134,14 @@ public final class VideoFrame extends AbstractTaggableRecord {
 		frameId = in.readInt();
 		groupId = in.readLong();
 
-		if (!isEndOfStreamFrame()) {
+		if (!isEndOfStreamFrame() && !isDummyFrame()) {
 			timestampInNanos = in.readLong();
 			frameImage = deserializeImage(in);
 		}
+	}
+
+	public boolean isDummyFrame() {
+		return this.frameId == -2;
 	}
 
 	private BufferedImage deserializeImage(DataInput in) throws IOException {
@@ -153,7 +166,8 @@ public final class VideoFrame extends AbstractTaggableRecord {
 
 		final DataBufferByte dbb = new DataBufferByte(bankData, size, offsets);
 
-		final WritableRaster wr = Raster.createWritableRaster(sampleModel, dbb, null);
+		final WritableRaster wr = Raster.createWritableRaster(sampleModel, dbb,
+				null);
 
 		return new BufferedImage(COLOR_MODEL, wr, false, null);
 	}
@@ -172,7 +186,8 @@ public final class VideoFrame extends AbstractTaggableRecord {
 			bandOffsets[i] = in.readInt();
 		}
 
-		return new PixelInterleavedSampleModel(dataType, width, height, pixelStride, scanlineStride, bandOffsets);
+		return new PixelInterleavedSampleModel(dataType, width, height,
+				pixelStride, scanlineStride, bandOffsets);
 	}
 
 	public boolean isEndOfStreamFrame() {

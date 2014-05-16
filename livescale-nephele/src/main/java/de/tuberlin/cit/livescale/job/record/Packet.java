@@ -20,6 +20,9 @@ public class Packet extends AbstractTaggableRecord {
 	 * Constructor used when reading a new Packet from a channel.
 	 */
 	public Packet() {
+		this.streamId = -1;
+		this.groupId = -1;
+		this.packetIdInStream = -2; // dummy packet
 	}
 
 	/**
@@ -86,10 +89,14 @@ public class Packet extends AbstractTaggableRecord {
 		out.writeLong(groupId);
 		out.writeInt(packetIdInStream);
 
-		if (!isEndOfStreamPacket()) {
+		if (!isEndOfStreamPacket() && !isDummyPacket()) {
 			out.writeInt(data.length);
 			out.write(data);
 		}
+	}
+
+	public boolean isDummyPacket() {
+		return this.packetIdInStream == -2;
 	}
 
 	@Override
@@ -100,7 +107,7 @@ public class Packet extends AbstractTaggableRecord {
 		groupId = in.readLong();
 		packetIdInStream = in.readInt();
 
-		if (!isEndOfStreamPacket()) {
+		if (!isEndOfStreamPacket() && !isDummyPacket()) {
 			int dataSize = in.readInt();
 			this.data = new byte[dataSize];
 			in.readFully(this.data);

@@ -376,7 +376,7 @@ public class Messaging {
 						sendEndpointPort == 0 || 
 						sendEndpointToken.isEmpty() || 
 						message.getUsername().isEmpty()) {
-						Log.d(TAG, String.format("%s received but was malformed", message.getClass().getSimpleName()));
+						Log.e(TAG, String.format("%s received but was malformed", message.getClass().getSimpleName()));
 						return;
 					}
 					BCConstants.STREAM_SERVER_SEND_HOST = sendEndpointAddress;

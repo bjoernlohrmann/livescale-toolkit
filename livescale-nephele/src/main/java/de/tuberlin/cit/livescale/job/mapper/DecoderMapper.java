@@ -25,7 +25,7 @@ public final class DecoderMapper implements Mapper<Packet, VideoFrame> {
 		VideoDecoder decoder = this.streamId2Decoder.get(input.getStreamId());
 		if (decoder == null) {
 			decoder = new VideoDecoder(input.getStreamId(), input.getGroupId());
-			streamId2Decoder.put(input.getStreamId(), decoder);
+			this.streamId2Decoder.put(input.getStreamId(), decoder);
 		}
 
 		VideoFrame frameToEmit = null;
@@ -34,7 +34,7 @@ public final class DecoderMapper implements Mapper<Packet, VideoFrame> {
 		} else {
 			frameToEmit = decoder.createEndOfStreamFrame();
 			decoder.closeDecoder();
-			streamId2Decoder.remove(input.getStreamId());
+			this.streamId2Decoder.remove(input.getStreamId());
 		}
 
 		if (frameToEmit != null) {

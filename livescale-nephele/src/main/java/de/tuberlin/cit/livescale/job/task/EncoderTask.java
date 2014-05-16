@@ -2,27 +2,24 @@ package de.tuberlin.cit.livescale.job.task;
 
 import java.util.Queue;
 
-import de.tuberlin.cit.livescale.job.event.StreamAnnounceEvent;
-import de.tuberlin.cit.livescale.job.event.StreamAnnounceReplyEvent;
 import de.tuberlin.cit.livescale.job.mapper.EncoderMapper;
 import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
-import de.tuberlin.cit.livescale.job.task.channelselectors.GroupedPacketChannelSelector;
+import de.tuberlin.cit.livescale.job.task.channelselectors.ChannelSelectorProvider;
 import de.tuberlin.cit.livescale.job.util.encoder.VideoEncoder;
-import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
-import eu.stratosphere.nephele.event.task.EventListener;
 import eu.stratosphere.nephele.execution.Mapper;
+import eu.stratosphere.nephele.io.ChannelSelector;
 import eu.stratosphere.nephele.io.RecordReader;
 import eu.stratosphere.nephele.io.RecordWriter;
 import eu.stratosphere.nephele.template.AbstractTask;
 
-public final class EncoderTask extends AbstractTask implements EventListener {
+public final class EncoderTask extends AbstractTask {
 
 	private RecordReader<VideoFrame> reader;
 
 	private RecordWriter<Packet> packetWriter;
 
-	private GroupedPacketChannelSelector channelSelector = new GroupedPacketChannelSelector();
+	private ChannelSelector<Packet> channelSelector;
 
 	private Mapper<VideoFrame, Packet> mapper;
 
@@ -31,10 +28,10 @@ public final class EncoderTask extends AbstractTask implements EventListener {
 	 */
 	@Override
 	public void registerInputOutput() {
+		this.channelSelector = ChannelSelectorProvider
+				.getPacketChannelSelector(getTaskConfiguration());
 		this.reader = new RecordReader<VideoFrame>(this, VideoFrame.class);
-		this.reader.subscribeToEvent(this, StreamAnnounceEvent.class);
-		this.packetWriter = new RecordWriter<Packet>(this, Packet.class, channelSelector);
-		this.packetWriter.subscribeToEvent(this, StreamAnnounceReplyEvent.class);
+		this.packetWriter = new RecordWriter<Packet>(this, Packet.class, this.channelSelector);
 		this.mapper = new EncoderMapper(getTaskConfiguration().getString(
 				VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv"));
 
@@ -51,8 +48,15 @@ public final class EncoderTask extends AbstractTask implements EventListener {
 
 		try {
 			while (this.reader.hasNext()) {
+				
+				VideoFrame frame = this.reader.next();
+				if(frame.isDummyFrame()) {
+					this.packetWriter.emit(new Packet());
+					this.packetWriter.flush();
+					continue;
+				}
 
-				this.mapper.map(this.reader.next());
+				this.mapper.map(frame);
 
 				boolean shouldFlush = false;
 				while (!outputCollector.isEmpty()) {
@@ -71,18 +75,6 @@ public final class EncoderTask extends AbstractTask implements EventListener {
 
 		while (!outputCollector.isEmpty()) {
 			this.packetWriter.emit(outputCollector.poll());
-		}
-	}
-
-	@Override
-	public void eventOccurred(AbstractTaskEvent event) {
-		try {
-			if (event instanceof StreamAnnounceEvent) {
-				packetWriter.publishEvent(event);
-			} else if (event instanceof StreamAnnounceReplyEvent) {
-				reader.publishEvent(event);
-			}
-		} catch (Exception e) {
 		}
 	}
 }

@@ -1,6 +1,5 @@
 package de.tuberlin.cit.livescale.job.mapper;
 
-import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -8,26 +7,48 @@ import de.tuberlin.cit.livescale.job.record.VideoFrame;
 import de.tuberlin.cit.livescale.job.util.overlay.LogoOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.OverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.TimeOverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.TwitterOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.VideoOverlay;
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.execution.Mapper;
 
 public final class OverlayMapper implements Mapper<VideoFrame, VideoFrame> {
 
-	private final OverlayProvider[] overlayProviders;
+	private OverlayProvider[] overlayProviders;
 
 	private final Queue<VideoFrame> outputCollector = new ArrayBlockingQueue<VideoFrame>(
 			8192);
 
+	private final Configuration conf;
+
+	public String OVERLAY_PROVIDER_SEQUENCE = "OVERLAY_PROVIDER_SEQUENCE";
+
+	public String DEFAULT_OVERLAY_PROVIDER_SEQUENCE = "time";
+
 	public OverlayMapper(Configuration conf) {
+		this.conf = conf;
+	}
 
-		this.overlayProviders = new OverlayProvider[2];
-		this.overlayProviders[0] = new TimeOverlayProvider();
+	public void startOverlays() throws Exception {
+		String[] overlayProviderSequence = this.conf.getString(
+				this.OVERLAY_PROVIDER_SEQUENCE,
+				this.DEFAULT_OVERLAY_PROVIDER_SEQUENCE).split("[,|]");
 
-		try {
-			this.overlayProviders[1] = new LogoOverlayProvider(conf);
-		} catch (IOException e) {
-			e.printStackTrace();
+		this.overlayProviders = new OverlayProvider[overlayProviderSequence.length];
+
+		for (int i = 0; i < overlayProviderSequence.length; i++) {
+			String currProvider = overlayProviderSequence[i];
+
+			if (currProvider.equals("time")) {
+				this.overlayProviders[i] = new TimeOverlayProvider();
+			} else if (currProvider.equals("logo")) {
+				this.overlayProviders[i] = new LogoOverlayProvider(this.conf);
+			} else if (currProvider.equals("twitter")) {
+				this.overlayProviders[i] = new TwitterOverlayProvider();
+			} else {
+				throw new Exception(String.format(
+						"Unknown overlay provider: %s", currProvider));
+			}
 		}
 
 		// Start the overlay providers before consuming the stream
@@ -45,10 +66,16 @@ public final class OverlayMapper implements Mapper<VideoFrame, VideoFrame> {
 		if (!input.isEndOfStreamFrame()) {
 			// Apply overlays to frame
 			for (final OverlayProvider overlayProvider : this.overlayProviders) {
-				final VideoOverlay videoOverlay = overlayProvider.getOverlay();
+				final VideoOverlay videoOverlay = overlayProvider
+						.getOverlayForStream(input.streamId);
+
 				if (videoOverlay != null) {
 					videoOverlay.draw(input);
 				}
+			}
+		} else {
+			for (final OverlayProvider overlayProvider : this.overlayProviders) {
+				overlayProvider.dropOverlayForStream(input.streamId);
 			}
 		}
 

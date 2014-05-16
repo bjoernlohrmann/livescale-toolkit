@@ -187,4 +187,20 @@ public class DerbyDbBackend implements DispatcherDbInterface {
 		}
 		return follower;
 	}
+
+	/* (non-Javadoc)
+	 * @see de.tuberlin.cit.livescale.dispatcher.db.DispatcherDbInterface#findStreamBySendToken(java.lang.String)
+	 */
+	@Override
+	public Stream findStreamBySendToken(String sendEndpointToken) {
+		EntityManager eM = eMFactory.createEntityManager();
+		eM.getTransaction().begin();
+		Stream stream = null;
+		try {
+			stream = (Stream) eM.createQuery("select x from Stream x where x.sendToken = ?1").setParameter(1, sendEndpointToken).getResultList().get(0);
+		} catch (Exception e) {
+		}
+		eM.close();
+		return stream;
+	}
 }

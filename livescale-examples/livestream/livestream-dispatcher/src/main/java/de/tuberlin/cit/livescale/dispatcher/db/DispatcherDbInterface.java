@@ -33,4 +33,6 @@ public interface DispatcherDbInterface {
 	public void removeObject(Object obj);
 	
 	public Object updateObject(Object obj);
+
+	public Stream findStreamBySendToken(String sendEndpointToken);
 }

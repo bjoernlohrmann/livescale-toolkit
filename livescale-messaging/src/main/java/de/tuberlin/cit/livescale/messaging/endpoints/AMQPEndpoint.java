@@ -208,6 +208,10 @@ public class AMQPEndpoint extends AbstractMessageEndpoint  {
 						.append(ROUTING_KEY_DELIMITER)
 						.append(this.routingKey).toString());
 		this.consumer = new QueueingConsumer(this.channel);
+		LOG.info("Bound to " + new StringBuilder(ROUTING_KEY_BROADCAST)
+		.append(ROUTING_KEY_DELIMITER)
+		.append(this.routingKey).toString());
+		
 		// declare a new queue with the instanceName "cit_stream_tasks_queue_[routingKey]"
 		// for instance: "cit_stream_tasks_queue_dispatcher"
 		// then bind this queue to this.exchangeName

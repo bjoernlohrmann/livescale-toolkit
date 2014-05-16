@@ -17,15 +17,11 @@ package de.tuberlin.cit.livescale.job.util.overlay;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-
-import javax.imageio.ImageIO;
 
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
 
 /**
- * @author bjoern
+ * @author Bjoern Lohrmann
  * 
  */
 public class LogoOverlay implements VideoOverlay {
@@ -43,11 +39,11 @@ public class LogoOverlay implements VideoOverlay {
 	 * 
 	 * @param string
 	 */
-	public LogoOverlay(String logoFile) throws IOException {
-		this.originalLogoImage = ImageIO.read(new File(logoFile));
-		this.scaledLogo = originalLogoImage;
-		this.scaledWidth = originalLogoImage.getWidth();
-		this.scaledHeight = originalLogoImage.getHeight();
+	public LogoOverlay(BufferedImage logoImage) {
+		this.originalLogoImage = logoImage;
+		this.scaledLogo = this.originalLogoImage;
+		this.scaledWidth = this.originalLogoImage.getWidth();
+		this.scaledHeight = this.originalLogoImage.getHeight();
 	}
 
 	/*
@@ -74,16 +70,16 @@ public class LogoOverlay implements VideoOverlay {
 	 * @param maxHeight
 	 */
 	private void ensureScaledLogoDimensions(int maxWidth, int maxHeight) {
-		if (scaledWidth > maxWidth || scaledHeight > maxHeight) {
+		if (this.scaledWidth > maxWidth || this.scaledHeight > maxHeight) {
 
 			double scaleFactor = Math.min(
-					maxWidth / ((double) originalLogoImage.getWidth()), maxHeight
-							/ ((double) originalLogoImage.getHeight()));
+					maxWidth / ((double) this.originalLogoImage.getWidth()), maxHeight
+							/ ((double) this.originalLogoImage.getHeight()));
 
-			scaledWidth = (int) (scaleFactor * originalLogoImage.getWidth());
-			scaledHeight = (int) (scaleFactor * originalLogoImage.getHeight());
-			scaledLogo = originalLogoImage.getScaledInstance(scaledWidth,
-					scaledHeight, Image.SCALE_SMOOTH);
+			this.scaledWidth = (int) (scaleFactor * this.originalLogoImage.getWidth());
+			this.scaledHeight = (int) (scaleFactor * this.originalLogoImage.getHeight());
+			this.scaledLogo = this.originalLogoImage.getScaledInstance(this.scaledWidth,
+					this.scaledHeight, Image.SCALE_SMOOTH);
 		}
 	}
 
@@ -92,8 +88,9 @@ public class LogoOverlay implements VideoOverlay {
 	 */
 	private void drawScaledLogo(BufferedImage frameImage) {
 		int x = 15;
-		int y = frameImage.getHeight() - scaledHeight - 15;
+//		int y = frameImage.getHeight() - scaledHeight - 15;
+		int y = 15;
 		Graphics2D g = (Graphics2D) frameImage.getGraphics();
-		g.drawImage(scaledLogo, x, y, null);
+		g.drawImage(this.scaledLogo, x, y, null);
 	}
 }

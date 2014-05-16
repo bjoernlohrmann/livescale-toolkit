@@ -12,6 +12,7 @@ citstreamerdb
 *.log
 *.apk
 *.ap_
+bin
 livescale-examples/livestream/livestream-android/bin
 livescale-examples/livestream/livestream-android/gen
 livescale-examples/livestream/livestream-android-test/bin

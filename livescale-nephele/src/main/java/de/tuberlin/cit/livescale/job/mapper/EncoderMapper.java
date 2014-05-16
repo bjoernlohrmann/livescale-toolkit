@@ -37,7 +37,7 @@ public final class EncoderMapper implements Mapper<VideoFrame, Packet> {
 		if (encoder == null) {
 			encoder = new VideoEncoder(input.streamId, input.groupId);
 			this.streamId2Encoder.put(input.streamId, encoder);
-			final Packet headerPacket = encoder.init(encoderOutputFormat);
+			final Packet headerPacket = encoder.init(this.encoderOutputFormat);
 			if (headerPacket != null) {
 				this.outputCollector.add(headerPacket);
 			}
@@ -75,7 +75,7 @@ public final class EncoderMapper implements Mapper<VideoFrame, Packet> {
 	@Override
 	public synchronized void close() {
 
-		for (final Entry<Long, VideoEncoder> entry : streamId2Encoder.entrySet()) {
+		for (final Entry<Long, VideoEncoder> entry : this.streamId2Encoder.entrySet()) {
 			try {
 				final VideoEncoder encoder = entry.getValue();
 				Packet packet = encoder.closeVideoEncoder();

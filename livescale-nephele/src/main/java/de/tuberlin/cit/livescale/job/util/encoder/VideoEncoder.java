@@ -33,9 +33,9 @@ public class VideoEncoder {
 
 	private int lastFrameId;
 
-	private long streamId;
+	private final long streamId;
 
-	private long groupId;
+	private final long groupId;
 
 	private IContainer container;
 

@@ -7,25 +7,19 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.imageio.ImageIO;
 
 import twitter4j.Status;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
 
 public class TwitterVideoOverlay implements VideoOverlay {
 
-	private static final int OUTER_MARGIN = 10;
+	public static final int OUTER_MARGIN = 10;
 
-	private static final int INNER_MARGIN = 5;
+	public static final int INNER_MARGIN = 5;
 
-	private static final int BOX_HEIGHT = 60;
+	public static final int BOX_HEIGHT = 60;
 
 	private final String user;
 
@@ -43,37 +37,12 @@ public class TwitterVideoOverlay implements VideoOverlay {
 
 	private final BufferedImage profileImage;
 
-	public TwitterVideoOverlay(final Status status) throws IOException {
+	public TwitterVideoOverlay(final Status status, BufferedImage profileImage) {
 
 		this.user = status.getUser().getScreenName();
 		this.text = status.getText();
-		System.out.println("Got twitter with text: " + this.text);
+		this.profileImage = profileImage;
 
-		final URL profileImageURL = null;// status.getUser().getProfileImageURL();
-		if (profileImageURL != null) {
-
-			final HttpURLConnection connection = (HttpURLConnection) profileImageURL.openConnection();
-			connection.setRequestMethod("GET");
-			connection.addRequestProperty("Accept", "image/gif, image/x-xbitmap, image/jpeg, image/pjpeg");
-			connection.setDoInput(true);
-			connection.setDoOutput(true);
-			connection.setUseCaches(false);
-
-			connection.connect();
-			final InputStream is = connection.getInputStream();
-			BufferedImage bi = ImageIO.read(is);
-			if (bi != null) {
-				if (bi.getHeight() >= BOX_HEIGHT) {
-					bi = null;
-				}
-			}
-
-			this.profileImage = bi;
-		} else {
-			this.profileImage = null;
-		}
-
-		// System.out.println(status.getUser().getProfileImageURL());
 		float[] scales = { 1f, 1f, 1f, 0.5f };
 		float[] offsets = new float[4];
 		this.whiteBoxRescaleOp = new RescaleOp(scales, offsets, null);
@@ -89,26 +58,31 @@ public class TwitterVideoOverlay implements VideoOverlay {
 
 		if (this.whiteBox == null) {
 			final int width = image.getWidth();
-			this.whiteBox = new BufferedImage(width - (2 * OUTER_MARGIN), BOX_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+			this.whiteBox = new BufferedImage(width - (2 * OUTER_MARGIN),
+					BOX_HEIGHT, BufferedImage.TYPE_INT_ARGB);
 			final Graphics g = this.whiteBox.getGraphics();
 			g.setColor(Color.WHITE);
-			g.fillRect(0, 0, this.whiteBox.getWidth(), this.whiteBox.getHeight());
+			g.fillRect(0, 0, this.whiteBox.getWidth(),
+					this.whiteBox.getHeight());
 		}
 
 		final Graphics2D g = (Graphics2D) image.getGraphics();
 
 		final int height = image.getHeight();
-		g.drawImage(this.whiteBox, this.whiteBoxRescaleOp, OUTER_MARGIN, height - OUTER_MARGIN - BOX_HEIGHT);
+		g.drawImage(this.whiteBox, this.whiteBoxRescaleOp, OUTER_MARGIN, height
+				- OUTER_MARGIN - BOX_HEIGHT);
 
 		int textXOffset = OUTER_MARGIN + INNER_MARGIN;
 		int textYOffset;
 
 		if (this.profileImage != null) {
 
-			final int offsetWithinBox = (BOX_HEIGHT - this.profileImage.getHeight()) / 2;
+			final int offsetWithinBox = (BOX_HEIGHT - this.profileImage
+					.getHeight()) / 2;
 			textYOffset = height - OUTER_MARGIN - BOX_HEIGHT + offsetWithinBox;
-			g.drawImage(this.profileImage, OUTER_MARGIN + offsetWithinBox, textYOffset, this.profileImage.getWidth(),
-				this.profileImage.getHeight(), null);
+			g.drawImage(this.profileImage, OUTER_MARGIN + offsetWithinBox,
+					textYOffset, this.profileImage.getWidth(),
+					this.profileImage.getHeight(), null);
 
 			textXOffset += offsetWithinBox + this.profileImage.getWidth();
 		} else {
@@ -137,8 +111,8 @@ public class TwitterVideoOverlay implements VideoOverlay {
 		textYOffset += textHeight;
 
 		if (this.formattedText == null) {
-			this.formattedText = cropText(this.text, fm, image.getWidth() - textXOffset - OUTER_MARGIN
-				- INNER_MARGIN);
+			this.formattedText = cropText(this.text, fm, image.getWidth()
+					- textXOffset - OUTER_MARGIN - INNER_MARGIN);
 		}
 
 		for (final CharSequence cs : this.formattedText) {
@@ -148,7 +122,8 @@ public class TwitterVideoOverlay implements VideoOverlay {
 
 	}
 
-	private static List<CharSequence> cropText(final String text, final FontMetrics fm, final int maxTextWidth) {
+	private static List<CharSequence> cropText(final String text,
+			final FontMetrics fm, final int maxTextWidth) {
 
 		String tmp = text;
 		final ArrayList<CharSequence> lines = new ArrayList<CharSequence>();
@@ -191,7 +166,8 @@ public class TwitterVideoOverlay implements VideoOverlay {
 		return lines;
 	}
 
-	private static int findCropPosition(String str, final FontMetrics fm, final int maxTextWidth) {
+	private static int findCropPosition(String str, final FontMetrics fm,
+			final int maxTextWidth) {
 
 		int pos = str.length();
 		while (fm.stringWidth(str) > maxTextWidth) {

@@ -1,33 +1,43 @@
 package de.tuberlin.cit.livescale.job.task;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import de.tuberlin.cit.livescale.job.event.StreamAnnounceEvent;
-import de.tuberlin.cit.livescale.job.event.StreamAnnounceReplyEvent;
 import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.util.receiver.FileVideoReceiver;
 import de.tuberlin.cit.livescale.job.util.receiver.FlvOverTcpForwardingReceiver;
 import de.tuberlin.cit.livescale.job.util.receiver.MpegTsHttpServerReceiver;
 import de.tuberlin.cit.livescale.job.util.receiver.UdpForwardingReceiver;
 import de.tuberlin.cit.livescale.job.util.receiver.VideoReceiver;
-import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
-import eu.stratosphere.nephele.event.task.EventListener;
+import de.tuberlin.cit.livescale.messaging.MessageCenter;
+import de.tuberlin.cit.livescale.messaging.MessageListener;
+import de.tuberlin.cit.livescale.messaging.messages.BroadcasterStreamAnnounceRequest;
+import de.tuberlin.cit.livescale.messaging.messages.StreamserverStreamAnnounceAnswer;
 import eu.stratosphere.nephele.io.RecordReader;
 import eu.stratosphere.nephele.template.AbstractOutputTask;
 
-public class VideoReceiverTask extends AbstractOutputTask implements
-		EventListener {
+public class BroadcasterTask extends AbstractOutputTask {
 
-	private static final Log LOG = LogFactory.getLog(VideoReceiverTask.class);
+	private static final Log LOG = LogFactory.getLog(BroadcasterTask.class);
 
 	public static final String BROADCAST_TRANSPORT = "BROADCAST_TRANSPORT";
 
 	public static final String DEFAULT_BROADCAST_TRANSPORT = "http";
+
+	public static final String SETUP_AMQP_MESSAGING = "SETUP_AMQP_MESSAGING";
+
+	public static final boolean DEFAULT_SETUP_AMQP_MESSAGING = false;
+
+	private static final String CONFIG_FILE_NAME = "broadcaster-messaging.properties";
+
+	private MessageCenter messageCenter;
 
 	private RecordReader<Packet> reader;
 
@@ -37,16 +47,21 @@ public class VideoReceiverTask extends AbstractOutputTask implements
 	@Override
 	public void registerInputOutput() {
 		this.reader = new RecordReader<Packet>(this, Packet.class);
-		this.reader.subscribeToEvent(this, StreamAnnounceEvent.class);
 	}
 
 	@Override
 	public void invoke() throws Exception {
-		try {
-			while (reader.hasNext()) {
-				Packet packet = reader.next();
 
-				VideoReceiver receiver = groupId2Receiver.get(packet
+		setupMessagingIfNecessary();
+
+		try {
+			while (this.reader.hasNext()) {
+				Packet packet = this.reader.next();
+				if (packet.isDummyPacket()) {
+					continue;
+				}
+
+				VideoReceiver receiver = this.groupId2Receiver.get(packet
 						.getGroupId());
 				if (receiver != null) {
 					if (!packet.isEndOfStreamPacket()) {
@@ -72,14 +87,14 @@ public class VideoReceiverTask extends AbstractOutputTask implements
 	private void dropReceiver(VideoReceiver receiver) {
 		LOG.info("Closing receiver for stream-group " + receiver.getGroupId());
 		receiver.closeSafely();
-		groupId2Receiver.remove(receiver.getGroupId());
+		this.groupId2Receiver.remove(receiver.getGroupId());
 	}
 
 	private void shutdown() {
-		for (VideoReceiver receiver : groupId2Receiver.values()) {
+		for (VideoReceiver receiver : this.groupId2Receiver.values()) {
 			receiver.closeSafely();
 		}
-		groupId2Receiver.clear();
+		this.groupId2Receiver.clear();
 	}
 
 	private VideoReceiver createVideoReceiver(long groupId,
@@ -106,7 +121,7 @@ public class VideoReceiverTask extends AbstractOutputTask implements
 				throw new RuntimeException("Unkown broadcast transport: "
 						+ broadcastTransport.toString());
 			}
-			groupId2Receiver.put(groupId, receiver);
+			this.groupId2Receiver.put(groupId, receiver);
 		} catch (IOException e) {
 			LOG.error("Error when creating video receiver for stream-group "
 					+ groupId, e);
@@ -115,31 +130,65 @@ public class VideoReceiverTask extends AbstractOutputTask implements
 		return receiver;
 	}
 
-	@Override
-	public void eventOccurred(AbstractTaskEvent event) {
-		try {
-			if (event instanceof StreamAnnounceEvent) {
-				handleStreamAnnounceEvent((StreamAnnounceEvent) event);
-			}
-		} catch (Exception e) {
-			LOG.error("Exception while handling event: "
-					+ event.getClass().getSimpleName(), e);
-		}
-	}
-
-	private void handleStreamAnnounceEvent(StreamAnnounceEvent event)
+	public void handleStreamAnnounceMessage(BroadcasterStreamAnnounceRequest msg)
 			throws Exception {
-		int targetReceiver = (int) (event.getGroupId() % getCurrentNumberOfSubtasks());
+
+		int targetReceiver = (int) (msg.getGroupId() % getCurrentNumberOfSubtasks());
+
 		LOG.info("Received new stream announce event");
 		if (targetReceiver == getIndexInSubtaskGroup()) {
 			LOG.info("Handling new stream announce event");
-			VideoReceiver receiver = createVideoReceiver(event.getGroupId(),
-					event.getReceiveEndpointToken());
-			StreamAnnounceReplyEvent reply = new StreamAnnounceReplyEvent(
-					event.getStreamId(), event.getGroupId());
-			reply.setSendEndpointToken(event.getSendEndpointToken());
+			VideoReceiver receiver = createVideoReceiver(msg.getGroupId(),
+					msg.getReceiveEndpointToken());
+
+			StreamserverStreamAnnounceAnswer reply = (StreamserverStreamAnnounceAnswer) msg
+					.getResponseMessage();
+			reply.setStreamId(msg.getStreamId());
+			reply.setGroupId(msg.getGroupId());
+			reply.setSendEndpointToken(msg.getSendEndpointToken());
 			reply.setReceiveEndpointUrl(receiver.getReceiveEndpointURL());
-			this.reader.publishEvent(reply);
+			this.messageCenter.sendResponse(reply);
 		}
 	}
+
+	private void setupMessagingIfNecessary() throws IOException {
+		if (!this.getTaskConfiguration().getBoolean(SETUP_AMQP_MESSAGING,
+				DEFAULT_SETUP_AMQP_MESSAGING)) {
+			return;
+		}
+		
+		try {
+			URL url = this.getClass().getClassLoader()
+					.getResource(CONFIG_FILE_NAME);
+			LOG.info(String.format("Loading messaging config from %s", url));
+			InputStream is = this.getClass().getClassLoader()
+					.getResourceAsStream(CONFIG_FILE_NAME);
+
+			Properties properties = new Properties();
+			properties.load(is);
+
+			this.messageCenter = new MessageCenter(false, properties);
+			this.messageCenter.addMessageListener(
+					BroadcasterStreamAnnounceRequest.class,
+					new MessageListener<BroadcasterStreamAnnounceRequest>() {
+						@Override
+						public void handleMessageReceived(
+								BroadcasterStreamAnnounceRequest message) {
+							LOG.info(String.format("Received message: %s",
+									message.getClass().getSimpleName()));
+							try {
+								handleStreamAnnounceMessage(message);
+							} catch (Exception e) {
+								LOG.error(e);
+							}
+						}
+					});
+			this.messageCenter.startAllEndpoints();
+
+		} catch (IOException e) {
+			LOG.error("Could not start Message center", e);
+			throw e;
+		}
+	}
+
 }

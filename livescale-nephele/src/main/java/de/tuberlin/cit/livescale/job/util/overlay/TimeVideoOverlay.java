@@ -23,7 +23,7 @@ public final class TimeVideoOverlay implements VideoOverlay {
 
 		final Graphics2D g = (Graphics2D) image.getGraphics();
 		g.setColor(Color.WHITE);
-		g.drawString(String.format("%.1f", time), image.getWidth() - X_OFFSET, Y_OFFSET);
+		g.drawString(String.format("%.1f", time), image.getWidth() - this.X_OFFSET, this.Y_OFFSET);
 	}
 
 }
