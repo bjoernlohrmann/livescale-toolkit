@@ -1,70 +1,52 @@
 package de.tuberlin.cit.livescale.job.task;
 
-import java.util.Queue;
-
-import de.tuberlin.cit.livescale.job.mapper.MergeMapper;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
-import de.tuberlin.cit.livescale.job.task.channelselectors.ChannelSelectorProvider;
-import eu.stratosphere.nephele.execution.Mapper;
-import eu.stratosphere.nephele.io.ChannelSelector;
-import eu.stratosphere.nephele.io.RecordReader;
-import eu.stratosphere.nephele.io.RecordWriter;
-import eu.stratosphere.nephele.template.AbstractTask;
+import de.tuberlin.cit.livescale.job.util.merge.MergeGroup;
+import eu.stratosphere.nephele.template.Collector;
+import eu.stratosphere.nephele.template.IoCTask;
+import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
+import eu.stratosphere.nephele.template.ReadFromWriteTo;
 
-public final class MergeTask extends AbstractTask {
+import java.util.HashMap;
+import java.util.Map;
 
-	private RecordReader<VideoFrame> reader;
+public final class MergeTask extends IoCTask {
 
-	private RecordWriter<VideoFrame> writer;
+  // Merge Mapper member
+  private final Map<Long, MergeGroup> groupMap = new HashMap<Long, MergeGroup>();
 
-	private final Mapper<VideoFrame, VideoFrame> mapper = new MergeMapper();
-	
-	private ChannelSelector<VideoFrame> channelSelector;
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void registerInputOutput() {
-		this.channelSelector = ChannelSelectorProvider
-				.getVideoFrameChannelSelector(getTaskConfiguration());
-		this.reader = new RecordReader<VideoFrame>(this, VideoFrame.class);
-		this.writer = new RecordWriter<VideoFrame>(this, VideoFrame.class, this.channelSelector);
-		getEnvironment().registerMapper(this.mapper);
-	}
+  @Override
+  protected void setup() {
+    initReader(0, VideoFrame.class);
+    initWriter(0, VideoFrame.class);
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void invoke() throws Exception {
+  @ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void merge(VideoFrame frame, Collector<VideoFrame> out) {
 
-		final Queue<VideoFrame> outputCollector = this.mapper.getOutputCollector();
+    final Long groupId = frame.groupId;
+    MergeGroup mergeGroup = groupMap.get(groupId);
+    if (mergeGroup == null) {
+      mergeGroup = new MergeGroup();
+      groupMap.put(groupId, mergeGroup);
+    }
 
-		try {
-			while (this.reader.hasNext()) {
+    mergeGroup.addFrame(frame);
 
-				final VideoFrame frame = this.reader.next();
+    VideoFrame mergedFrame = mergeGroup.mergedFrameAvailable();
+    while (mergedFrame != null) {
+      out.emit(mergedFrame);
+      if (mergedFrame.isEndOfStreamFrame()) {
+        out.flush();
+      }
+      mergedFrame = mergeGroup.mergedFrameAvailable();
+    }
+  }
 
-				this.mapper.map(frame);
 
-				boolean shouldFlush = false;
-				while (!outputCollector.isEmpty()) {
-					VideoFrame frameToEmit = outputCollector.poll();
-					this.writer.emit(frameToEmit);
-					shouldFlush = shouldFlush || frameToEmit.isEndOfStreamFrame();
-				}
-
-				if (shouldFlush) {
-					this.writer.flush();
-				}
-			}
-		} finally {
-			this.mapper.close();
-		}
-
-		while (!outputCollector.isEmpty()) {
-			this.writer.emit(outputCollector.poll());
-		}
-	}
+  @LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void last(Collector<VideoFrame> out) {
+    groupMap.clear();
+  }
 }

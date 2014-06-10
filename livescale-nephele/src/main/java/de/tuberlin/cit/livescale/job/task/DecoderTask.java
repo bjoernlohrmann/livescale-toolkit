@@ -1,74 +1,64 @@
 package de.tuberlin.cit.livescale.job.task;
 
-import java.util.Queue;
-
-import de.tuberlin.cit.livescale.job.mapper.DecoderMapper;
 import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
-import de.tuberlin.cit.livescale.job.task.channelselectors.ChannelSelectorProvider;
-import eu.stratosphere.nephele.execution.Mapper;
-import eu.stratosphere.nephele.io.ChannelSelector;
-import eu.stratosphere.nephele.io.RecordReader;
-import eu.stratosphere.nephele.io.RecordWriter;
-import eu.stratosphere.nephele.template.AbstractTask;
+import de.tuberlin.cit.livescale.job.task.channelselectors.GroupVideoFrameChannelSelector;
+import de.tuberlin.cit.livescale.job.util.decoder.VideoDecoder;
+import eu.stratosphere.nephele.template.Collector;
+import eu.stratosphere.nephele.template.IoCTask;
+import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
+import eu.stratosphere.nephele.template.ReadFromWriteTo;
 
-public final class DecoderTask extends AbstractTask {
-	
-	private RecordWriter<VideoFrame> writer;
+import java.util.HashMap;
+import java.util.Map;
 
-	private RecordReader<Packet> packetReader;
+public final class DecoderTask extends IoCTask {
 
-	private ChannelSelector<VideoFrame> channelSelector;
+  private final GroupVideoFrameChannelSelector channelSelector = new GroupVideoFrameChannelSelector();
+  private final Map<Long, VideoDecoder> streamId2Decoder = new HashMap<Long, VideoDecoder>();
 
-	private final Mapper<Packet, VideoFrame> mapper = new DecoderMapper();
+  @Override
+  public void setup() {
+    initReader(0, Packet.class);
+    initWriter(0, VideoFrame.class, channelSelector);
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void registerInputOutput() {
-		this.channelSelector = ChannelSelectorProvider
-				.getVideoFrameChannelSelector(getTaskConfiguration());
-		this.packetReader = new RecordReader<Packet>(this, Packet.class);
-		this.writer = new RecordWriter<VideoFrame>(this, VideoFrame.class, this.channelSelector);
-		getEnvironment().registerMapper(this.mapper);
-	}
+  @ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void decode(Packet packet, Collector<VideoFrame> out) {
+    try {
+      VideoDecoder decoder = streamId2Decoder.get(packet.getStreamId());
+      if (decoder == null) {
+        decoder = new VideoDecoder(packet.getStreamId(), packet.getGroupId());
+        streamId2Decoder.put(packet.getStreamId(), decoder);
+      }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void invoke() throws Exception {
+      VideoFrame frameToEmit;
+      if (!packet.isEndOfStreamPacket()) {
+        frameToEmit = decoder.decodePacket(packet);
+      } else {
+        frameToEmit = decoder.createEndOfStreamFrame();
+        decoder.closeDecoder();
+        streamId2Decoder.remove(packet.getStreamId());
+      }
 
-		final Queue<VideoFrame> outputCollector = this.mapper.getOutputCollector();
+      if (frameToEmit != null) {
+        out.emit(frameToEmit);
+      }
 
-		try {
-			while (this.packetReader.hasNext()) {
-				Packet packet = this.packetReader.next();
-				if(packet.isDummyPacket()) {
-					this.writer.emit(new VideoFrame());
-					this.writer.flush();
-					continue;
-				}
-				this.mapper.map(packet);
+      if (frameToEmit.isEndOfStreamFrame()) {
+        out.flush();
+      }
 
-				boolean shouldFlush = false;
-				while (!outputCollector.isEmpty()) {
-					VideoFrame frameToEmit = outputCollector.poll();
-					this.writer.emit(frameToEmit);
-					shouldFlush = shouldFlush || frameToEmit.isEndOfStreamFrame();
-				}
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
 
-				if (shouldFlush) {
-					this.writer.flush();
-				}
-			}
-		} finally {
-			this.mapper.close();
-		}
-
-		while (!outputCollector.isEmpty()) {
-			this.writer.emit(outputCollector.poll());
-		}
-	}
+  @LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void last(Collector<VideoFrame> out) {
+    for (final VideoDecoder decoder : streamId2Decoder.values()) {
+      decoder.closeDecoder();
+    }
+    streamId2Decoder.clear();
+  }
 }

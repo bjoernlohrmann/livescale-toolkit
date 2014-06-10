@@ -1,81 +1,123 @@
 package de.tuberlin.cit.livescale.job.task;
 
-import java.util.Queue;
-
-import de.tuberlin.cit.livescale.job.mapper.OverlayMapper;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
-import de.tuberlin.cit.livescale.job.task.channelselectors.ChannelSelectorProvider;
-import eu.stratosphere.nephele.io.ChannelSelector;
-import eu.stratosphere.nephele.io.RecordReader;
-import eu.stratosphere.nephele.io.RecordWriter;
-import eu.stratosphere.nephele.template.AbstractTask;
+import de.tuberlin.cit.livescale.job.util.overlay.LogoOverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.OverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.TimeOverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.TwitterOverlayProvider;
+import de.tuberlin.cit.livescale.job.util.overlay.VideoOverlay;
+import eu.stratosphere.nephele.configuration.Configuration;
+import eu.stratosphere.nephele.template.Collector;
+import eu.stratosphere.nephele.template.IoCTask;
+import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
+import eu.stratosphere.nephele.template.ReadFromWriteTo;
 
-public class OverlayTask extends AbstractTask {
+import java.io.IOException;
 
-	private RecordReader<VideoFrame> reader;
+public class OverlayTask extends IoCTask {
+  // Overlay mapper members
+  private OverlayProvider[] overlayProviders;
+  private Configuration conf;
+  public String OVERLAY_PROVIDER_SEQUENCE = "OVERLAY_PROVIDER_SEQUENCE";
+  public String DEFAULT_OVERLAY_PROVIDER_SEQUENCE = "time";
 
-	private RecordWriter<VideoFrame> writer;
+  @Override
+  protected void setup() {
+    initReader(0, VideoFrame.class);
+    initWriter(0, VideoFrame.class);
 
-	private OverlayMapper mapper;
-	
-	private ChannelSelector<VideoFrame> channelSelector;
+    conf = getTaskConfiguration();
+    this.overlayProviders = new OverlayProvider[2];
+    this.overlayProviders[0] = new TimeOverlayProvider();
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void registerInputOutput() {
-		this.channelSelector = ChannelSelectorProvider
-				.getVideoFrameChannelSelector(getTaskConfiguration());
-		this.reader = new RecordReader<VideoFrame>(this, VideoFrame.class);
-		this.writer = new RecordWriter<VideoFrame>(this, VideoFrame.class, this.channelSelector);
-		this.mapper = new OverlayMapper(this.getTaskConfiguration());
-		getEnvironment().registerMapper(this.mapper);
-	}
+    try {
+      this.overlayProviders[1] = new LogoOverlayProvider(conf);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void invoke() throws Exception {
-		
-		this.mapper.startOverlays();
-		
-		final Queue<VideoFrame> outputCollector = this.mapper
-				.getOutputCollector();
+    // Start the overlay providers before consuming the stream
+    for (final OverlayProvider overlayProvider : this.overlayProviders) {
+      if (overlayProvider != null) {
+        overlayProvider.start();
+      }
+    }
 
-		try {
-			// Consume the stream
-			while (this.reader.hasNext()) {
+    try {
+      startOverlays();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
-				final VideoFrame frame = this.reader.next();
-				
-				if(frame.isDummyFrame()) {
-					this.writer.emit(new VideoFrame());
-					this.writer.flush();
-					continue;
-				}
+  }
 
-				this.mapper.map(frame);
+  public void startOverlays() throws Exception {
+    String[] overlayProviderSequence = this.conf.getString(
+        this.OVERLAY_PROVIDER_SEQUENCE,
+        this.DEFAULT_OVERLAY_PROVIDER_SEQUENCE).split("[,|]");
 
-				boolean shouldFlush = false;
-				while (!outputCollector.isEmpty()) {
-					VideoFrame frameToEmit = outputCollector.poll();
-					this.writer.emit(frameToEmit);
-					shouldFlush = shouldFlush
-							|| frameToEmit.isEndOfStreamFrame();
-				}
+    this.overlayProviders = new OverlayProvider[overlayProviderSequence.length];
 
-				if (shouldFlush) {
-					this.writer.flush();
-				}
-			}
-		} finally {
-			this.mapper.close();
-		}
+    for (int i = 0; i < overlayProviderSequence.length; i++) {
+      String currProvider = overlayProviderSequence[i];
 
-		while (!outputCollector.isEmpty()) {
-			this.writer.emit(outputCollector.poll());
-		}
-	}
+      if (currProvider.equals("time")) {
+        this.overlayProviders[i] = new TimeOverlayProvider();
+      } else if (currProvider.equals("logo")) {
+        this.overlayProviders[i] = new LogoOverlayProvider(this.conf);
+      } else if (currProvider.equals("twitter")) {
+        this.overlayProviders[i] = new TwitterOverlayProvider();
+      } else {
+        throw new Exception(String.format(
+            "Unknown overlay provider: %s", currProvider));
+      }
+    }
+
+    // Start the overlay providers before consuming the stream
+    for (final OverlayProvider overlayProvider : this.overlayProviders) {
+      overlayProvider.start();
+    }
+  }
+
+  @ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void overlay(VideoFrame frame, Collector<VideoFrame> out) {
+
+    if (frame.isDummyFrame()) {
+      out.emit(new VideoFrame());
+      out.flush();
+      return;
+    }
+
+    if (!frame.isEndOfStreamFrame()) {
+      // Apply overlays to frame
+      for (final OverlayProvider overlayProvider : this.overlayProviders) {
+        if (overlayProvider != null) {
+          final VideoOverlay videoOverlay = overlayProvider
+              .getOverlayForStream(frame.streamId);
+
+          if (videoOverlay != null) {
+            videoOverlay.draw(frame);
+          }
+        }
+      }
+    } else {
+      for (final OverlayProvider overlayProvider : this.overlayProviders) {
+        overlayProvider.dropOverlayForStream(frame.streamId);
+      }
+    }
+
+    out.emit(frame);
+
+    if (frame.isEndOfStreamFrame()) {
+      out.flush();
+    }
+  }
+
+  @LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void last(Collector<VideoFrame> out) {
+    for (final OverlayProvider overlayProvider : this.overlayProviders) {
+      overlayProvider.stop();
+    }
+  }
+
 }

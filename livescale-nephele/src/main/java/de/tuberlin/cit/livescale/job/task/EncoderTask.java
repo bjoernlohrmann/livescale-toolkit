@@ -1,80 +1,94 @@
 package de.tuberlin.cit.livescale.job.task;
 
-import java.util.Queue;
-
-import de.tuberlin.cit.livescale.job.mapper.EncoderMapper;
 import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
-import de.tuberlin.cit.livescale.job.task.channelselectors.ChannelSelectorProvider;
+import de.tuberlin.cit.livescale.job.task.channelselectors.GroupPacketChannelSelector;
 import de.tuberlin.cit.livescale.job.util.encoder.VideoEncoder;
-import eu.stratosphere.nephele.execution.Mapper;
-import eu.stratosphere.nephele.io.ChannelSelector;
-import eu.stratosphere.nephele.io.RecordReader;
-import eu.stratosphere.nephele.io.RecordWriter;
-import eu.stratosphere.nephele.template.AbstractTask;
+import eu.stratosphere.nephele.template.Collector;
+import eu.stratosphere.nephele.template.IoCTask;
+import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
+import eu.stratosphere.nephele.template.ReadFromWriteTo;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-public final class EncoderTask extends AbstractTask {
+import java.util.HashMap;
+import java.util.Map;
 
-	private RecordReader<VideoFrame> reader;
+public final class EncoderTask extends IoCTask {
 
-	private RecordWriter<Packet> packetWriter;
+  private GroupPacketChannelSelector channelSelector = new GroupPacketChannelSelector();
+  private static final Log LOG = LogFactory.getLog(EncoderTask.class);
+  private final HashMap<Long, VideoEncoder> streamId2Encoder = new HashMap<Long, VideoEncoder>();
+  private String encoderOutputFormat;
 
-	private ChannelSelector<Packet> channelSelector;
 
-	private Mapper<VideoFrame, Packet> mapper;
+  @Override
+  protected void setup() {
+    initReader(0, VideoFrame.class);
+    initWriter(0, Packet.class, channelSelector);
+    encoderOutputFormat = getTaskConfiguration().getString(VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv");
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void registerInputOutput() {
-		this.channelSelector = ChannelSelectorProvider
-				.getPacketChannelSelector(getTaskConfiguration());
-		this.reader = new RecordReader<VideoFrame>(this, VideoFrame.class);
-		this.packetWriter = new RecordWriter<Packet>(this, Packet.class, this.channelSelector);
-		this.mapper = new EncoderMapper(getTaskConfiguration().getString(
-				VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv"));
+  @ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void encode(VideoFrame frame, Collector<Packet> out) throws InterruptedException {
 
-		getEnvironment().registerMapper(this.mapper);
-	}
+    if (frame.isDummyFrame()) {
+      out.emit(new Packet());
+      out.flush();
+      return;
+    }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void invoke() throws Exception {
+    VideoEncoder encoder = streamId2Encoder.get(frame.streamId);
+    if (encoder == null) {
+      encoder = new VideoEncoder(frame.streamId, frame.groupId);
+      streamId2Encoder.put(frame.streamId, encoder);
+      final Packet headerPacket = encoder.init(encoderOutputFormat);
+      if (headerPacket != null) {
+        out.emit(headerPacket);
+      }
+    }
 
-		final Queue<Packet> outputCollector = this.mapper.getOutputCollector();
+    if (!frame.isEndOfStreamFrame()) {
+      final Packet packet = encoder.encodeFrame(frame);
+      if (packet != null) {
+        out.emit(packet);
+      }
+    } else {
+      final Packet packet = encoder.closeVideoEncoder();
+      if (packet != null) {
+        out.emit(packet);
+      }
+      final Packet eofPacket = createEndOfStreamPacket(frame.streamId, frame.groupId);
+      out.emit(eofPacket);
+      out.flush();
+      streamId2Encoder.remove(frame.streamId);
+    }
+  }
 
-		try {
-			while (this.reader.hasNext()) {
-				
-				VideoFrame frame = this.reader.next();
-				if(frame.isDummyFrame()) {
-					this.packetWriter.emit(new Packet());
-					this.packetWriter.flush();
-					continue;
-				}
+  private Packet createEndOfStreamPacket(final long streamId, final long groupId) {
 
-				this.mapper.map(frame);
+    LOG.debug(String.format("Creating end of stream packet for stream %d", streamId));
 
-				boolean shouldFlush = false;
-				while (!outputCollector.isEmpty()) {
-					Packet packetToEmit = outputCollector.poll();
-					this.packetWriter.emit(packetToEmit);
-					shouldFlush = shouldFlush || packetToEmit.isEndOfStreamPacket();
-				}
+    final Packet endOfStreamPacket = new Packet(streamId, groupId, 0, null);
+    endOfStreamPacket.markAsEndOfStreamPacket();
 
-				if (shouldFlush) {
-					this.packetWriter.flush();
-				}
-			}
-		} finally {
-			this.mapper.close();
-		}
+    return endOfStreamPacket;
+  }
 
-		while (!outputCollector.isEmpty()) {
-			this.packetWriter.emit(outputCollector.poll());
-		}
-	}
+  @LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+  public void last(Collector<Packet> out) {
+    for (final Map.Entry<Long, VideoEncoder> entry : streamId2Encoder.entrySet()) {
+      try {
+        final VideoEncoder encoder = entry.getValue();
+        Packet packet = encoder.closeVideoEncoder();
+        out.emit(packet);
+
+        Packet eofPacket = createEndOfStreamPacket(encoder.getStreamId(), encoder.getGroupId());
+        out.emit(eofPacket);
+      } catch (Exception e) {
+      }
+    }
+
+    streamId2Encoder.clear();
+  }
 }
