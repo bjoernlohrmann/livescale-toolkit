@@ -1,15 +1,15 @@
 package de.tuberlin.cit.livescale;
 
 import java.io.IOException;
+import java.util.Arrays;
 
+import de.tuberlin.cit.livescale.job.task.BroadcasterTask;
 import de.tuberlin.cit.livescale.job.task.DecoderTask;
 import de.tuberlin.cit.livescale.job.task.EncoderTask;
 import de.tuberlin.cit.livescale.job.task.MergeTask;
-import de.tuberlin.cit.livescale.job.task.VideoFileStreamSourceTask;
 import de.tuberlin.cit.livescale.job.task.OverlayTask;
-import de.tuberlin.cit.livescale.job.task.BroadcasterTask;
+import de.tuberlin.cit.livescale.job.task.VideoFileStreamSourceTask;
 import de.tuberlin.cit.livescale.job.util.encoder.VideoEncoder;
-import de.tuberlin.cit.livescale.job.util.overlay.LogoOverlayProvider;
 import eu.stratosphere.nephele.client.JobClient;
 import eu.stratosphere.nephele.client.JobExecutionException;
 import eu.stratosphere.nephele.configuration.ConfigConstants;
@@ -37,124 +37,69 @@ import eu.stratosphere.nephele.streaming.ConstraintUtil;
  */
 public class LivescaleParallelJob {
 
-	private static final String INSTANCE_TYPE = "default";
-
-	private static final int NUMBER_OF_SUBTASKS_PER_INSTANCE = 2;
-
 	public static void main(final String[] args) {
 
-		if (args.length != 4) {
-			System.err
-					.println("Parameters: <video-directory> <degree of parallelism> <number of streams> <number of stream per group>");
+		if (args.length != 3) {
+			printUsage();
 			System.exit(1);
 			return;
 		}
-
-		int degreeOfParallelism;
-		try {
-			degreeOfParallelism = Integer.parseInt(args[1]);
-		} catch (NumberFormatException e) {
-			e.printStackTrace();
+				
+		String jmHost = args[0].split(":")[0];
+		int jmPort = Integer.parseInt(args[0].split(":")[1]);
+		
+		LivescaleParallelJobProfile profile = LivescaleParallelJobProfile.PROFILES.get(args[1]);
+		if (profile == null) {
+			System.err.printf("Unknown profile: %s\n", args[1]);
+			printUsage();
 			System.exit(1);
-			return;
+			return;			
 		}
-
-		if (degreeOfParallelism < 1) {
-			System.err.println("Degree of parallelism must be greater than 0");
-			System.exit(1);
-			return;
-		}
-
-		int numberOfStreams;
-		try {
-			numberOfStreams = Integer.parseInt(args[2]);
-		} catch (NumberFormatException e) {
-			e.printStackTrace();
-			System.exit(1);
-			return;
-		}
-
-		if (numberOfStreams < 1) {
-			System.err.println("Number of streams must be greater than 0");
-			System.exit(1);
-			return;
-		}
-
-		int numberOfStreamsPerGroup;
-		try {
-			numberOfStreamsPerGroup = Integer.parseInt(args[3]);
-		} catch (NumberFormatException e) {
-			e.printStackTrace();
-			System.exit(1);
-			return;
-		}
-
-		if (numberOfStreamsPerGroup < 1) {
-			System.err
-					.println("Number of streams per group must be greater than 0");
-			System.exit(1);
-			return;
-		}
-
+		
+		String videoDir = args[2];
+		
 		try {
 			final JobGraph graph = new JobGraph("Streaming Job with File Input");
-
-			final int numberOfSourceTasks = Math
-					.max(1, degreeOfParallelism / 8);
 
 			final JobInputVertex fileStreamSource = new JobInputVertex(
 					"MultiFileStreamSource", graph);
 			fileStreamSource.setInputClass(VideoFileStreamSourceTask.class);
-			fileStreamSource.setNumberOfSubtasks(numberOfSourceTasks);
-			final int streamsPerSubtask = Math.max(1, numberOfStreams
-					/ numberOfSourceTasks);
+			fileStreamSource.setNumberOfSubtasks(profile.outerTaskDop);
+			fileStreamSource.setNumberOfSubtasksPerInstance(profile.outerTaskDopPerInstance);
 			fileStreamSource.getConfiguration().setInteger(
 					VideoFileStreamSourceTask.NO_OF_STREAMS_PER_SUBTASK,
-					streamsPerSubtask);
+					Math.max(1, profile.noOfStreams / profile.outerTaskDop));
 			fileStreamSource.getConfiguration().setInteger(
 					VideoFileStreamSourceTask.NO_OF_STREAMS_PER_GROUP,
-					numberOfStreamsPerGroup);
+					profile.noOfStreamsPerGroup);
 			fileStreamSource.getConfiguration().setString(
-					VideoFileStreamSourceTask.VIDEO_FILE_DIRECTORY, args[0]);
-			fileStreamSource.setInstanceType(INSTANCE_TYPE);
-			fileStreamSource.setNumberOfSubtasksPerInstance(1);
+					VideoFileStreamSourceTask.VIDEO_FILE_DIRECTORY, videoDir);
+			
 
 			final JobTaskVertex decoder = new JobTaskVertex("Decoder", graph);
-			decoder.setNumberOfSubtasks(degreeOfParallelism);
 			decoder.setTaskClass(DecoderTask.class);
-			decoder.setInstanceType(INSTANCE_TYPE);
-			decoder.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
-
+			configureInnerTaskParallelism(decoder, profile);
+			
 			final JobTaskVertex merger = new JobTaskVertex("Merger", graph);
-			merger.setNumberOfSubtasks(degreeOfParallelism);
 			merger.setTaskClass(MergeTask.class);
-			merger.setInstanceType(INSTANCE_TYPE);
-			merger.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
-
+			configureInnerTaskParallelism(merger, profile);
+			
 			final JobTaskVertex overlay = new JobTaskVertex("Overlay", graph);
 			overlay.setTaskClass(OverlayTask.class);
-			overlay.setNumberOfSubtasks(degreeOfParallelism);
-			overlay.getConfiguration().setString(
-					LogoOverlayProvider.LOGO_OVERLAY_IMAGE,
-					"/home/bjoern/logo.png");
-			overlay.setInstanceType(INSTANCE_TYPE);
-			overlay.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
+			configureInnerTaskParallelism(overlay, profile);
 
 			final JobTaskVertex encoder = new JobTaskVertex("Encoder", graph);
-			encoder.setNumberOfSubtasks(degreeOfParallelism);
 			encoder.setTaskClass(EncoderTask.class);
 			encoder.getConfiguration().setString(
 					VideoEncoder.ENCODER_OUTPUT_FORMAT, "mpegts");
-			encoder.setInstanceType(INSTANCE_TYPE);
-			encoder.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
+			configureInnerTaskParallelism(encoder, profile);
 
 			final JobOutputVertex output = new JobOutputVertex("Receiver",
 					graph);
 			output.setOutputClass(BroadcasterTask.class);
-			output.getConfiguration().setString(
-					BroadcasterTask.BROADCAST_TRANSPORT, "http");
-			output.setInstanceType(INSTANCE_TYPE);
-			output.setNumberOfSubtasksPerInstance(NUMBER_OF_SUBTASKS_PER_INSTANCE);
+			output.setNumberOfSubtasks(profile.outerTaskDop);
+			output.setNumberOfSubtasksPerInstance(profile.outerTaskDopPerInstance);
+			output.getConfiguration().setString(BroadcasterTask.BROADCAST_TRANSPORT, "http");
 
 			fileStreamSource.connectTo(decoder, ChannelType.NETWORK,
 					DistributionPattern.BIPARTITE);
@@ -178,55 +123,24 @@ public class LivescaleParallelJob {
 			encoder.setVertexToShareInstancesWith(fileStreamSource);
 			output.setVertexToShareInstancesWith(fileStreamSource);
 
-			// decoder.setVertexToShareInstancesWith(fileStreamSource);
-			// merger.setVertexToShareInstancesWith(decoder);
-			// overlay.setVertexToShareInstancesWith(merger);
-			// encoder.setVertexToShareInstancesWith(overlay);
-			// output.setVertexToShareInstancesWith(encoder);
-
 			// Create jar file for job deployment
 			Process p = Runtime.getRuntime().exec("mvn clean package");
 			if (p.waitFor() != 0) {
 				System.out.println("Failed to build livescale-nephele jar");
 				System.exit(1);
 			}
-
-			String userHome = System.getProperty("user.home");
-
 			graph.addJar(new Path("target/livescale-nephele-git.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/com/rabbitmq/amqp-client/2.8.4/amqp-client-2.8.4.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/de/tuberlin/cit/livescale-messaging/git/livescale-messaging-git.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/xuggle/xuggle-xuggler/5.4/xuggle-xuggler-5.4.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/org/slf4j/slf4j-api/1.6.4/slf4j-api-1.6.4.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/commons-cli/commons-cli/1.1/commons-cli-1.1.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/ch/qos/logback/logback-classic/1.0.0/logback-classic-1.0.0.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/ch/qos/logback/logback-core/1.0.0/logback-core-1.0.0.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/org/twitter4j/twitter4j-core/3.0.5/twitter4j-core-3.0.5.jar"));
-			graph.addJar(new Path(
-					userHome
-							+ "/.m2/repository/org/twitter4j/twitter4j-stream/3.0.5/twitter4j-stream-3.0.5.jar"));
+
+			// add further jar dependencies to the graph.
+			// for large deployments it is better to comment this out
+			// and place the jars into the local classpath on each node.
+			// this dramatically reduces deployment time.
+			addDependencyJars(graph);
 
 			Configuration conf = new Configuration();
 			conf.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY,
-					"127.0.0.1");
-			conf.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY,
-					ConfigConstants.DEFAULT_JOB_MANAGER_IPC_PORT);
+					jmHost);
+			conf.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, jmPort);
 
 			final JobClient jobClient = new JobClient(graph, conf);
 			jobClient.submitJobAndWait();
@@ -240,4 +154,38 @@ public class LivescaleParallelJob {
 		} catch (InterruptedException e) {
 		}
 	}
+
+	private static void addDependencyJars(final JobGraph graph) {
+		String baseDir = System.getProperty("user.home") + "/.m2/repository/";
+		graph.addJar(new Path(
+				baseDir + "/com/rabbitmq/amqp-client/2.8.4/amqp-client-2.8.4.jar"));
+		graph.addJar(new Path(
+				baseDir + "/de/tuberlin/cit/livescale-messaging/git/livescale-messaging-git.jar"));
+		graph.addJar(new Path(
+				baseDir + "/xuggle/xuggle-xuggler/5.4/xuggle-xuggler-5.4.jar"));
+		graph.addJar(new Path(
+				baseDir + "/org/slf4j/slf4j-api/1.6.4/slf4j-api-1.6.4.jar"));
+		graph.addJar(new Path(
+				baseDir + "/commons-cli/commons-cli/1.1/commons-cli-1.1.jar"));
+		graph.addJar(new Path(
+				baseDir + "/ch/qos/logback/logback-classic/1.0.0/logback-classic-1.0.0.jar"));
+		graph.addJar(new Path(
+				baseDir + "/ch/qos/logback/logback-core/1.0.0/logback-core-1.0.0.jar"));
+		graph.addJar(new Path(
+				baseDir + "/org/twitter4j/twitter4j-core/3.0.5/twitter4j-core-3.0.5.jar"));
+		graph.addJar(new Path(
+				baseDir + "/org/twitter4j/twitter4j-stream/3.0.5/twitter4j-stream-3.0.5.jar"));
+	}
+
+	private static void configureInnerTaskParallelism(JobTaskVertex innerTask,
+			LivescaleParallelJobProfile profile) {
+		innerTask.setNumberOfSubtasks(profile.innerTaskDop);
+		innerTask.setNumberOfSubtasksPerInstance(profile.innerTaskDopPerInstance);
+	}
+
+	private static void printUsage() {
+		System.err.println("Parameters: <jobmanager-host>:<port> <profile-name> <video-directory>");
+		System.err.printf("Available profiles: %s\n",
+				Arrays.toString(LivescaleParallelJobProfile.PROFILES.keySet().toArray()));
+	}	
 }
