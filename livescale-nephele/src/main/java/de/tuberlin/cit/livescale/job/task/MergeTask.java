@@ -12,41 +12,39 @@ import java.util.Map;
 
 public final class MergeTask extends IoCTask {
 
-  // Merge Mapper member
-  private final Map<Long, MergeGroup> groupMap = new HashMap<Long, MergeGroup>();
+	// Merge Mapper member
+	private final Map<Long, MergeGroup> groupMap = new HashMap<Long, MergeGroup>();
 
+	@Override
+	protected void setup() {
+		initReader(0, VideoFrame.class);
+		initWriter(0, VideoFrame.class);
+	}
 
-  @Override
-  protected void setup() {
-    initReader(0, VideoFrame.class);
-    initWriter(0, VideoFrame.class);
-  }
+	@ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	public void merge(VideoFrame frame, Collector<VideoFrame> out) {
 
-  @ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
-  public void merge(VideoFrame frame, Collector<VideoFrame> out) {
+		final Long groupId = frame.groupId;
+		MergeGroup mergeGroup = groupMap.get(groupId);
+		if (mergeGroup == null) {
+			mergeGroup = new MergeGroup();
+			groupMap.put(groupId, mergeGroup);
+		}
 
-    final Long groupId = frame.groupId;
-    MergeGroup mergeGroup = groupMap.get(groupId);
-    if (mergeGroup == null) {
-      mergeGroup = new MergeGroup();
-      groupMap.put(groupId, mergeGroup);
-    }
+		mergeGroup.addFrame(frame);
 
-    mergeGroup.addFrame(frame);
+		VideoFrame mergedFrame = mergeGroup.mergedFrameAvailable();
+		while (mergedFrame != null) {
+			out.emit(mergedFrame);
+			if (mergedFrame.isEndOfStreamFrame()) {
+				out.flush();
+			}
+			mergedFrame = mergeGroup.mergedFrameAvailable();
+		}
+	}
 
-    VideoFrame mergedFrame = mergeGroup.mergedFrameAvailable();
-    while (mergedFrame != null) {
-      out.emit(mergedFrame);
-      if (mergedFrame.isEndOfStreamFrame()) {
-        out.flush();
-      }
-      mergedFrame = mergeGroup.mergedFrameAvailable();
-    }
-  }
-
-
-  @LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
-  public void last(Collector<VideoFrame> out) {
-    groupMap.clear();
-  }
+	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	public void last(Collector<VideoFrame> out) {
+		groupMap.clear();
+	}
 }

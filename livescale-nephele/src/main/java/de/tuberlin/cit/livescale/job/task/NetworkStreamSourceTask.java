@@ -57,7 +57,7 @@ public class NetworkStreamSourceTask extends AbstractGenericInputTask {
 	private final static String ROUTING_KEY_BROADCASTER = "broadcast.broadcaster";
 
 	private static final String ROUTING_KEY_DISPATCHER = "broadcast.dispatcher";
-	
+
 	private static final String CIT_STREAM_EXCHANGE = "cit_stream_exchange";
 
 	private static final String CONFIG_FILE_NAME = "networkstreamsource-messaging.properties";
@@ -395,8 +395,7 @@ public class NetworkStreamSourceTask extends AbstractGenericInputTask {
 			LOG.debug("Sending DispatcherStreamClose");
 			URI uri = new AMQPEndpoint.URIBuilder()
 					.exchangeName(CIT_STREAM_EXCHANGE)
-					.routingKey(ROUTING_KEY_DISPATCHER)
-					.build();
+					.routingKey(ROUTING_KEY_DISPATCHER).build();
 			this.messageCenter.send(msg, uri);
 		} catch (URISyntaxException e1) {
 			LOG.fatal(
@@ -474,9 +473,8 @@ public class NetworkStreamSourceTask extends AbstractGenericInputTask {
 
 		LOG.info("Sending streamAnnounce");
 		URI uri = new AMQPEndpoint.URIBuilder()
-			.exchangeName(CIT_STREAM_EXCHANGE)	
-			.routingKey(ROUTING_KEY_BROADCASTER)
-			.build();
+				.exchangeName(CIT_STREAM_EXCHANGE)
+				.routingKey(ROUTING_KEY_BROADCASTER).build();
 		this.messageCenter.send(streamAnnounce, uri);
 	}
 

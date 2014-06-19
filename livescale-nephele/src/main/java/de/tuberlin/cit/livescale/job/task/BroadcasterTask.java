@@ -156,7 +156,7 @@ public class BroadcasterTask extends AbstractOutputTask {
 				DEFAULT_SETUP_AMQP_MESSAGING)) {
 			return;
 		}
-		
+
 		try {
 			URL url = this.getClass().getClassLoader()
 					.getResource(CONFIG_FILE_NAME);

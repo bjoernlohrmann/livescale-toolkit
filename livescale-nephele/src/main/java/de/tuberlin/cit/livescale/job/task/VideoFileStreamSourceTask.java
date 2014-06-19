@@ -18,7 +18,8 @@ import eu.stratosphere.nephele.template.AbstractGenericInputTask;
 
 public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 
-	private static final Log LOG = LogFactory.getLog(VideoFileStreamSourceTask.class);
+	private static final Log LOG = LogFactory
+			.getLog(VideoFileStreamSourceTask.class);
 
 	public static final String NO_OF_STREAMS_PER_SUBTASK = "NO_OF_STREAMS_PER_TASK";
 
@@ -42,13 +43,16 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 	public void registerInputOutput() {
 		this.channelSelector = ChannelSelectorProvider
 				.getPacketChannelSelector(getTaskConfiguration());
-		this.out = new RecordWriter<Packet>(this, Packet.class, this.channelSelector);
+		this.out = new RecordWriter<Packet>(this, Packet.class,
+				this.channelSelector);
 	}
 
 	@Override
 	public void invoke() throws Exception {
-		this.noOfStreamsPerTask = getTaskConfiguration().getInteger(NO_OF_STREAMS_PER_SUBTASK, 2);
-		this.noOfStreamsPerGroup = getTaskConfiguration().getInteger(NO_OF_STREAMS_PER_GROUP, 2);
+		this.noOfStreamsPerTask = getTaskConfiguration().getInteger(
+				NO_OF_STREAMS_PER_SUBTASK, 2);
+		this.noOfStreamsPerGroup = getTaskConfiguration().getInteger(
+				NO_OF_STREAMS_PER_GROUP, 2);
 
 		try {
 			loadVideoFiles();
@@ -59,19 +63,26 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 			while (true) {
 				long now = System.currentTimeMillis();
 
-				timeOfNextWrite = this.pendingStreams.peek().getTimeOfWriteForCurrentPacket();
+				timeOfNextWrite = this.pendingStreams.peek()
+						.getTimeOfWriteForCurrentPacket();
 				if (timeOfNextWrite > now) {
 					Thread.sleep(timeOfNextWrite - now);
 					now = System.currentTimeMillis();
 				}
 
-				while (this.pendingStreams.peek().getTimeOfWriteForCurrentPacket() <= now) {
-					
-					if (now - this.pendingStreams.peek().getTimeOfWriteForCurrentPacket() > 1000) {
-						System.out.println("stream source is behind by " + (now - this.pendingStreams.peek().getTimeOfWriteForCurrentPacket()));
+				while (this.pendingStreams.peek()
+						.getTimeOfWriteForCurrentPacket() <= now) {
+
+					if (now
+							- this.pendingStreams.peek()
+									.getTimeOfWriteForCurrentPacket() > 1000) {
+						System.out.println("stream source is behind by "
+								+ (now - this.pendingStreams.peek()
+										.getTimeOfWriteForCurrentPacket()));
 					}
-					
-					PrioritizedLivestream livestream = this.pendingStreams.remove();
+
+					PrioritizedLivestream livestream = this.pendingStreams
+							.remove();
 
 					Packet packet = createNextPacket(livestream);
 					this.out.emit(packet);
@@ -81,7 +92,8 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 					if (livestream.isEOF()) {
 						Packet endOfStreamPacket = createEndOfStreamPacket(livestream);
 						this.out.emit(endOfStreamPacket);
-						LOG.info("Sent end of stream packet for stream " + livestream.getStreamId());
+						LOG.info("Sent end of stream packet for stream "
+								+ livestream.getStreamId());
 
 						// restart stream immediately
 						livestream.rewind(now + 100);
@@ -94,7 +106,8 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 	}
 
 	private Packet createEndOfStreamPacket(PrioritizedLivestream livestream) {
-		Packet endOfStreamPacket = new Packet(livestream.getStreamId(), livestream.getGroupId(), 0, null);
+		Packet endOfStreamPacket = new Packet(livestream.getStreamId(),
+				livestream.getGroupId(), 0, null);
 		endOfStreamPacket.markAsEndOfStreamPacket();
 		return endOfStreamPacket;
 	}
@@ -104,21 +117,24 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 		livestream.fillArrayWithCurrentPacketPayload(packetData, 0);
 
 		return new Packet(livestream.getStreamId(), livestream.getGroupId(),
-			livestream.getPacketIdInStreamForCurrentPacket(), packetData);
+				livestream.getPacketIdInStreamForCurrentPacket(), packetData);
 	}
 
 	private void initLivestreams() {
 		int nextVideoFileIndex = (int) (Math.random() * this.videoFiles.size());
 		int nextStreamId = getIndexInSubtaskGroup() * this.noOfStreamsPerTask;
 
-		int noOfGroups = (getCurrentNumberOfSubtasks() * this.noOfStreamsPerTask) / this.noOfStreamsPerGroup;
+		int noOfGroups = (getCurrentNumberOfSubtasks() * this.noOfStreamsPerTask)
+				/ this.noOfStreamsPerGroup;
 
 		for (int i = 0; i < this.noOfStreamsPerTask; i++) {
 			int groupId = nextStreamId % noOfGroups;
-			long startTime = System.currentTimeMillis() + ((long) (Math.random() * 10000));
-			PrioritizedLivestream livestream = new PrioritizedLivestream(this.videoFiles.get(nextVideoFileIndex),
-				true, nextStreamId, groupId, startTime);
-			
+			long startTime = System.currentTimeMillis()
+					+ ((long) (Math.random() * 10000));
+			PrioritizedLivestream livestream = new PrioritizedLivestream(
+					this.videoFiles.get(nextVideoFileIndex), true,
+					nextStreamId, groupId, startTime);
+
 			nextStreamId++;
 			nextVideoFileIndex = (int) (Math.random() * this.videoFiles.size());
 			this.pendingStreams.add(livestream);
@@ -126,15 +142,18 @@ public class VideoFileStreamSourceTask extends AbstractGenericInputTask {
 	}
 
 	private void loadVideoFiles() throws IOException {
-		File videoDir = new File(getTaskConfiguration().getString(VIDEO_FILE_DIRECTORY, "videos"));
+		File videoDir = new File(getTaskConfiguration().getString(
+				VIDEO_FILE_DIRECTORY, "videos"));
 
 		if (!videoDir.exists() || !videoDir.canRead()) {
-			throw new IOException("Cannot read video directory " + videoDir.getAbsolutePath());
+			throw new IOException("Cannot read video directory "
+					+ videoDir.getAbsolutePath());
 		}
 
 		for (String file : videoDir.list()) {
 			if (file.endsWith(".packetized")) {
-				VideoFile videoFile = new VideoFile(videoDir.getAbsolutePath() + File.separator + file);
+				VideoFile videoFile = new VideoFile(videoDir.getAbsolutePath()
+						+ File.separator + file);
 				videoFile.loadIntoMemory();
 				this.videoFiles.add(videoFile);
 			}
