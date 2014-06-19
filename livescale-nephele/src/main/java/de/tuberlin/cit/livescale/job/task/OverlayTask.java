@@ -6,18 +6,15 @@ import de.tuberlin.cit.livescale.job.util.overlay.OverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.TimeOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.TwitterOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.VideoOverlay;
-import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.template.Collector;
 import eu.stratosphere.nephele.template.IoCTask;
 import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
 import eu.stratosphere.nephele.template.ReadFromWriteTo;
 
-import java.io.IOException;
-
 public class OverlayTask extends IoCTask {
 	// Overlay mapper members
 	private OverlayProvider[] overlayProviders;
-	private Configuration conf;
+
 	public String OVERLAY_PROVIDER_SEQUENCE = "OVERLAY_PROVIDER_SEQUENCE";
 	public String DEFAULT_OVERLAY_PROVIDER_SEQUENCE = "time";
 
@@ -26,33 +23,15 @@ public class OverlayTask extends IoCTask {
 		initReader(0, VideoFrame.class);
 		initWriter(0, VideoFrame.class);
 
-		conf = getTaskConfiguration();
-		this.overlayProviders = new OverlayProvider[2];
-		this.overlayProviders[0] = new TimeOverlayProvider();
-
-		try {
-			this.overlayProviders[1] = new LogoOverlayProvider(conf);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		// Start the overlay providers before consuming the stream
-		for (final OverlayProvider overlayProvider : this.overlayProviders) {
-			if (overlayProvider != null) {
-				overlayProvider.start();
-			}
-		}
-
 		try {
 			startOverlays();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 	}
 
 	public void startOverlays() throws Exception {
-		String[] overlayProviderSequence = this.conf.getString(
+		String[] overlayProviderSequence = this.getTaskConfiguration().getString(
 				this.OVERLAY_PROVIDER_SEQUENCE,
 				this.DEFAULT_OVERLAY_PROVIDER_SEQUENCE).split("[,|]");
 
@@ -64,7 +43,7 @@ public class OverlayTask extends IoCTask {
 			if (currProvider.equals("time")) {
 				this.overlayProviders[i] = new TimeOverlayProvider();
 			} else if (currProvider.equals("logo")) {
-				this.overlayProviders[i] = new LogoOverlayProvider(this.conf);
+				this.overlayProviders[i] = new LogoOverlayProvider(this.getTaskConfiguration());
 			} else if (currProvider.equals("twitter")) {
 				this.overlayProviders[i] = new TwitterOverlayProvider();
 			} else {

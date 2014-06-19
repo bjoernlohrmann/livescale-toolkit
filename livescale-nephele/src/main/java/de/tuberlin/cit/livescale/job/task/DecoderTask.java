@@ -44,10 +44,10 @@ public final class DecoderTask extends IoCTask {
 
 			if (frameToEmit != null) {
 				out.emit(frameToEmit);
-			}
-
-			if (frameToEmit.isEndOfStreamFrame()) {
-				out.flush();
+				
+				if (frameToEmit.isEndOfStreamFrame()) {
+					out.flush();
+				}
 			}
 
 		} catch (Exception e) {
