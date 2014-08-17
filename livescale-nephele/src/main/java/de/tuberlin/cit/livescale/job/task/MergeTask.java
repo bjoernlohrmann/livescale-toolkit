@@ -2,15 +2,14 @@ package de.tuberlin.cit.livescale.job.task;
 
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
 import de.tuberlin.cit.livescale.job.util.merge.MergeGroup;
-import eu.stratosphere.nephele.template.Collector;
-import eu.stratosphere.nephele.template.IoCTask;
-import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
-import eu.stratosphere.nephele.template.ReadFromWriteTo;
+import eu.stratosphere.nephele.template.ioc.Collector;
+import eu.stratosphere.nephele.template.ioc.IocTask;
+import eu.stratosphere.nephele.template.ioc.ReadFromWriteTo;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public final class MergeTask extends IoCTask {
+public final class MergeTask extends IocTask {
 
 	// Merge Mapper member
 	private final Map<Long, MergeGroup> groupMap = new HashMap<Long, MergeGroup>();
@@ -21,7 +20,7 @@ public final class MergeTask extends IoCTask {
 		initWriter(0, VideoFrame.class);
 	}
 
-	@ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	@ReadFromWriteTo(readerIndex = 0, writerIndices = 0)
 	public void merge(VideoFrame frame, Collector<VideoFrame> out) {
 
 		final Long groupId = frame.groupId;
@@ -35,7 +34,7 @@ public final class MergeTask extends IoCTask {
 
 		VideoFrame mergedFrame = mergeGroup.mergedFrameAvailable();
 		while (mergedFrame != null) {
-			out.emit(mergedFrame);
+			out.collect(mergedFrame);
 			if (mergedFrame.isEndOfStreamFrame()) {
 				out.flush();
 			}
@@ -43,8 +42,8 @@ public final class MergeTask extends IoCTask {
 		}
 	}
 
-	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
-	public void last(Collector<VideoFrame> out) {
+	@Override
+	protected void shutdown() {
 		groupMap.clear();
 	}
 }

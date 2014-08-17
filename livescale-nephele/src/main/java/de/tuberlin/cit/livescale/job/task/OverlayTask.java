@@ -6,12 +6,11 @@ import de.tuberlin.cit.livescale.job.util.overlay.OverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.TimeOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.TwitterOverlayProvider;
 import de.tuberlin.cit.livescale.job.util.overlay.VideoOverlay;
-import eu.stratosphere.nephele.template.Collector;
-import eu.stratosphere.nephele.template.IoCTask;
-import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
-import eu.stratosphere.nephele.template.ReadFromWriteTo;
+import eu.stratosphere.nephele.template.ioc.Collector;
+import eu.stratosphere.nephele.template.ioc.IocTask;
+import eu.stratosphere.nephele.template.ioc.ReadFromWriteTo;
 
-public class OverlayTask extends IoCTask {
+public class OverlayTask extends IocTask {
 	// Overlay mapper members
 	private OverlayProvider[] overlayProviders;
 
@@ -58,11 +57,11 @@ public class OverlayTask extends IoCTask {
 		}
 	}
 
-	@ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	@ReadFromWriteTo(readerIndex = 0, writerIndices = 0)
 	public void overlay(VideoFrame frame, Collector<VideoFrame> out) {
 
 		if (frame.isDummyFrame()) {
-			out.emit(new VideoFrame());
+			out.collect(new VideoFrame());
 			out.flush();
 			return;
 		}
@@ -85,18 +84,17 @@ public class OverlayTask extends IoCTask {
 			}
 		}
 
-		out.emit(frame);
+		out.collect(frame);
 
 		if (frame.isEndOfStreamFrame()) {
 			out.flush();
 		}
 	}
 
-	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
-	public void last(Collector<VideoFrame> out) {
+	@Override
+	protected void shutdown() {
 		for (final OverlayProvider overlayProvider : this.overlayProviders) {
 			overlayProvider.stop();
 		}
 	}
-
 }

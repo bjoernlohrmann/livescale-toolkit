@@ -4,15 +4,14 @@ import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
 import de.tuberlin.cit.livescale.job.task.channelselectors.GroupVideoFrameChannelSelector;
 import de.tuberlin.cit.livescale.job.util.decoder.VideoDecoder;
-import eu.stratosphere.nephele.template.Collector;
-import eu.stratosphere.nephele.template.IoCTask;
-import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
-import eu.stratosphere.nephele.template.ReadFromWriteTo;
+import eu.stratosphere.nephele.template.ioc.Collector;
+import eu.stratosphere.nephele.template.ioc.IocTask;
+import eu.stratosphere.nephele.template.ioc.ReadFromWriteTo;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public final class DecoderTask extends IoCTask {
+public final class DecoderTask extends IocTask {
 
 	private final GroupVideoFrameChannelSelector channelSelector = new GroupVideoFrameChannelSelector();
 	private final Map<Long, VideoDecoder> streamId2Decoder = new HashMap<Long, VideoDecoder>();
@@ -23,7 +22,7 @@ public final class DecoderTask extends IoCTask {
 		initWriter(0, VideoFrame.class, channelSelector);
 	}
 
-	@ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	@ReadFromWriteTo(readerIndex = 0, writerIndices = 0)
 	public void decode(Packet packet, Collector<VideoFrame> out) {
 		try {
 			VideoDecoder decoder = streamId2Decoder.get(packet.getStreamId());
@@ -43,7 +42,7 @@ public final class DecoderTask extends IoCTask {
 			}
 
 			if (frameToEmit != null) {
-				out.emit(frameToEmit);
+				out.collect(frameToEmit);
 				
 				if (frameToEmit.isEndOfStreamFrame()) {
 					out.flush();
@@ -55,8 +54,8 @@ public final class DecoderTask extends IoCTask {
 		}
 	}
 
-	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
-	public void last(Collector<VideoFrame> out) {
+	@Override
+	protected void shutdown() {
 		for (final VideoDecoder decoder : streamId2Decoder.values()) {
 			decoder.closeDecoder();
 		}
