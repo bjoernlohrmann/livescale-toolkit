@@ -4,17 +4,17 @@ import de.tuberlin.cit.livescale.job.record.Packet;
 import de.tuberlin.cit.livescale.job.record.VideoFrame;
 import de.tuberlin.cit.livescale.job.task.channelselectors.GroupPacketChannelSelector;
 import de.tuberlin.cit.livescale.job.util.encoder.VideoEncoder;
-import eu.stratosphere.nephele.template.Collector;
-import eu.stratosphere.nephele.template.IoCTask;
-import eu.stratosphere.nephele.template.LastRecordReadFromWriteTo;
-import eu.stratosphere.nephele.template.ReadFromWriteTo;
+import eu.stratosphere.nephele.template.ioc.Collector;
+import eu.stratosphere.nephele.template.ioc.IocTask;
+import eu.stratosphere.nephele.template.ioc.LastRecordReadFromWriteTo;
+import eu.stratosphere.nephele.template.ioc.ReadFromWriteTo;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public final class EncoderTask extends IoCTask {
+public final class EncoderTask extends IocTask {
 
 	private GroupPacketChannelSelector channelSelector = new GroupPacketChannelSelector();
 	private static final Log LOG = LogFactory.getLog(EncoderTask.class);
@@ -29,12 +29,12 @@ public final class EncoderTask extends IoCTask {
 				VideoEncoder.ENCODER_OUTPUT_FORMAT, "flv");
 	}
 
-	@ReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	@ReadFromWriteTo(readerIndex = 0, writerIndices = 0)
 	public void encode(VideoFrame frame, Collector<Packet> out)
 			throws InterruptedException {
 
 		if (frame.isDummyFrame()) {
-			out.emit(new Packet());
+			out.collect(new Packet());
 			out.flush();
 			return;
 		}
@@ -45,23 +45,23 @@ public final class EncoderTask extends IoCTask {
 			streamId2Encoder.put(frame.streamId, encoder);
 			final Packet headerPacket = encoder.init(encoderOutputFormat);
 			if (headerPacket != null) {
-				out.emit(headerPacket);
+				out.collect(headerPacket);
 			}
 		}
 
 		if (!frame.isEndOfStreamFrame()) {
 			final Packet packet = encoder.encodeFrame(frame);
 			if (packet != null) {
-				out.emit(packet);
+				out.collect(packet);
 			}
 		} else {
 			final Packet packet = encoder.closeVideoEncoder();
 			if (packet != null) {
-				out.emit(packet);
+				out.collect(packet);
 			}
 			final Packet eofPacket = createEndOfStreamPacket(frame.streamId,
 					frame.groupId);
-			out.emit(eofPacket);
+			out.collect(eofPacket);
 			out.flush();
 			streamId2Encoder.remove(frame.streamId);
 		}
@@ -79,19 +79,19 @@ public final class EncoderTask extends IoCTask {
 		return endOfStreamPacket;
 	}
 
-	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndex = 0)
+	@LastRecordReadFromWriteTo(readerIndex = 0, writerIndices = 0)
 	public void last(Collector<Packet> out) {
 		for (final Map.Entry<Long, VideoEncoder> entry : streamId2Encoder
 				.entrySet()) {
 			try {
 				final VideoEncoder encoder = entry.getValue();
 				Packet packet = encoder.closeVideoEncoder();
-				out.emit(packet);
+				out.collect(packet);
 
 				Packet eofPacket = createEndOfStreamPacket(
 						encoder.getStreamId(), encoder.getGroupId());
-				out.emit(eofPacket);
-			} catch (Exception e) {
+				out.collect(eofPacket);
+			} catch (Exception ignored) {
 			}
 		}
 
